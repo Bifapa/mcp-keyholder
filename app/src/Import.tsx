@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, errText, MODE_INFO, MODE_ROLES, TIER_LABEL, TIER_ROLES, type ImportFile, type Mode, type Tier } from "./api";
-import { Icon, Roles, Segmented } from "./ui";
+import { Icon, Segmented } from "./ui";
 
 /** A group for this import: keys in it take its settings unless they have their own. */
 interface GroupDef {
@@ -49,9 +49,39 @@ function loadGroups(): GroupDef[] {
   return DEFAULT_GROUPS;
 }
 
-/** Short "who does what" for the effective settings. */
-function settingsRows(tier: Tier, mode: Mode): [string, string][] {
-  return tier === "sealed" ? TIER_ROLES.sealed : [...TIER_ROLES[tier], ...MODE_ROLES[mode === "env" ? "env" : "reveal"].slice(1)];
+/** What each approval level and delivery mode means — one block at the top of the page. */
+function Legend() {
+  const line = (rows: [string, string][]) => rows.map(([who, what]) => `${who}: ${what}.`).join(" ");
+  return (
+    <details className="card pad legend" open>
+      <summary>What the approval levels and delivery modes mean</summary>
+      <div className="legend-grid">
+        <div className="col" style={{ gap: 6 }}>
+          <span className="field-title">Approval when an agent asks</span>
+          <dl>
+            {TIERS.map((t) => (
+              <Fragment key={t}>
+                <dt>{TIER_LABEL[t]}</dt>
+                <dd>{line(TIER_ROLES[t])}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </div>
+        <div className="col" style={{ gap: 6 }}>
+          <span className="field-title">How the agent gets the key</span>
+          <dl>
+            {DELIVERY.map((m) => (
+              <Fragment key={m}>
+                <dt>{MODE_INFO[m].title}</dt>
+                <dd>{line(MODE_ROLES[m === "env" ? "env" : "reveal"])}</dd>
+              </Fragment>
+            ))}
+          </dl>
+          <span className="hint">Sealed keys are never given to agents, so delivery does not apply to them.</span>
+        </div>
+      </div>
+    </details>
+  );
 }
 
 export function ImportPage({ existing, onDone }: { existing: string[]; onDone: () => void }) {
@@ -263,6 +293,7 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
 
       {files.length > 0 && (
         <>
+          <Legend />
           <div className="card pad col" style={{ gap: 10 }}>
             <div className="row wrap">
               <span className="grow" style={{ fontWeight: 600 }}>
@@ -456,25 +487,20 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
                   </label>
 
                   {!draft.own ? (
-                    <div className="col" style={{ gap: 8 }}>
-                      <span className="field-title">
-                        From the group: {TIER_LABEL[draftGroup.tier]}
-                        {draftGroup.tier === "sealed" ? "" : ` · ${MODE_INFO[draftGroup.mode].title}`}
-                      </span>
-                      <Roles rows={settingsRows(draftGroup.tier, draftGroup.mode)} />
-                    </div>
+                    <span className="field-title">
+                      From the group: {TIER_LABEL[draftGroup.tier]}
+                      {draftGroup.tier === "sealed" ? "" : ` · ${MODE_INFO[draftGroup.mode].title}`}
+                    </span>
                   ) : (
                     <>
                       <div className="col" style={{ gap: 8 }}>
                         <span className="field-title">Approval when an agent asks</span>
                         <Segmented<Tier> label="Approval level" value={draft.tier} onChange={(t) => upd(sel!, { tier: t })} options={TIERS.map((t) => ({ id: t, label: TIER_LABEL[t] }))} />
-                        <Roles rows={TIER_ROLES[draft.tier]} />
                       </div>
                       {draft.tier !== "sealed" && (
                         <div className="col" style={{ gap: 8 }}>
                           <span className="field-title">How the agent gets the key</span>
                           <Segmented<Mode> label="Delivery mode" value={draft.mode} onChange={(m) => upd(sel!, { mode: m })} options={DELIVERY.map((m) => ({ id: m, label: MODE_INFO[m].title }))} />
-                          <Roles rows={MODE_ROLES[draft.mode === "env" ? "env" : "reveal"]} />
                         </div>
                       )}
                     </>

@@ -1100,3 +1100,32 @@ input[type="checkbox"] {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* Import: one legend for approval levels and delivery modes. */
+.legend summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.legend[open] summary {
+  margin-bottom: 12px;
+}
+.legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px 28px;
+}
+.legend dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+.legend dt {
+  font-weight: 600;
+  color: var(--ink);
+}
+.legend dd {
+  margin: 0;
+  color: var(--ink-2);
+}
