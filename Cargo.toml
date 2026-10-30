@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = ["crates/kh-core", "crates/kh-daemon", "crates/kh-service", "crates/kh-cli", "app/src-tauri"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Bifastack"]
+
+[workspace.dependencies]
+kh-core = { path = "crates/kh-core" }
+kh-daemon = { path = "crates/kh-daemon" }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "sync", "time", "process"] }
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+data-encoding = "2"
+
+# Argon2 is unusably slow without optimisations; keep it fast in dev builds too.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true

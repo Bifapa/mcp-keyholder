@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7A5AEE"/>
+      <stop offset="1" stop-color="#5F3DD6"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="224" fill="url(#bg)"/>
+  <!-- 2×2 grid, r = 136, step = 332; the key shaft beyond the ring is exactly one dot diameter (272) -->
+  <g fill="#FFFFFF">
+    <circle cx="244" cy="244" r="136"/>
+    <circle cx="576" cy="244" r="136"/>
+    <circle cx="244" cy="576" r="136"/>
+    <g transform="rotate(45 576 576)">
+      <path fill-rule="evenodd" d="M576 440a136 136 0 1 1 0 272a136 136 0 1 1 0-272zm0 74a62 62 0 1 0 0 124a62 62 0 1 0 0-124z"/>
+      <rect x="702" y="544" width="282" height="64"/>
+      <rect x="944" y="492" width="40" height="54"/>
+      <rect x="868" y="500" width="40" height="46"/>
+    </g>
+  </g>
+</svg>

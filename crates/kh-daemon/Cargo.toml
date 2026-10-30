@@ -1,0 +1,18 @@
+[package]
+name = "kh-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "KeyHolder daemon: core operations, agent sessions, approvals. Runs in the app or as the Windows service"
+
+[dependencies]
+kh-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+zeroize.workspace = true
+uuid.workspace = true
+data-encoding.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

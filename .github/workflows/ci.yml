@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Core tests
+        run: cargo test -p kh-core -p kh-daemon
+      - name: Interface type check
+        working-directory: app
+        run: |
+          npm ci
+          npx tsc --noEmit -p .
+      - name: Build kh and the service
+        run: cargo build -p kh-cli -p kh-service

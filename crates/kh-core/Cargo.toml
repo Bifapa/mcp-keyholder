@@ -1,0 +1,43 @@
+[package]
+name = "kh-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "KeyHolder core: encrypted vault, policy, TOTP, audit log, leak scanning, IPC protocol"
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+zeroize.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+data-encoding.workspace = true
+tokio.workspace = true
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+hmac = "0.12"
+sha1 = "0.10"
+subtle = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+aho-corasick = "1"
+regex = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_Security_Cryptography",
+  "Win32_System_Threading",
+  "Win32_System_Pipes",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_ErrorReporting",
+  "Win32_System_Memory",
+  "Win32_System_Services",
+] }
+
+[dev-dependencies]
+tempfile = "3"

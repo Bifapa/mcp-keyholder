@@ -1,0 +1,17 @@
+# Build output
+/target
+/app/dist
+/app/node_modules
+/app/src-tauri/gen
+
+# Never commit vaults, transfer files or signing keys
+*.mcpkey
+*.key
+vault.db*
+*.db-wal
+*.db-shm
+
+# Local tooling
+.vscode/
+.idea/
+*.log

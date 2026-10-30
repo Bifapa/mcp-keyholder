@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MCP Keyholder",
+  "version": "1.0.0",
+  "identifier": "dev.bifastack.keyholder",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "MCP Keyholder",
+        "url": "index.html",
+        "width": 1240,
+        "height": 820,
+        "minWidth": 880,
+        "minHeight": 600,
+        "center": true,
+        "visible": false,
+        "contentProtected": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ipc: http://ipc.localhost",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "publisher": "Bifastack",
+    "copyright": "© 2026 Bifastack",
+    "category": "Utility",
+    "shortDescription": "Local secrets vault for AI agents (MCP)",
+    "licenseFile": "../../LICENSE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "windows/hooks.nsh",
+        "languages": ["Russian", "English"],
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENEMkU5OEVFODQ5RDk3MzgKUldRNGw1MkU3cGd1elYwQkRzMHdWdGswaG1IMkI3NEV6M3BsMW42TG13WjMyTzIwSEpKWGJ0U08K",
+      "endpoints": ["https://github.com/Bifapa/mcp-keyholder-releases/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
+  "mainBinaryName": "keyholder"
+}
