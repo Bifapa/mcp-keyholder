@@ -26,3 +26,27 @@ jobs:
           npx tsc --noEmit -p .
       - name: Build kh and the service
         run: cargo build -p kh-cli -p kh-service
+
+  # macOS: everything must build and the core tests must pass, so the Mac version does not
+  # quietly break while development happens on Windows.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Interface
+        working-directory: app
+        run: |
+          npm ci
+          npx tsc --noEmit -p .
+          npm run build
+      - name: Core tests
+        run: cargo test -p kh-core -p kh-daemon
+      - name: Build kh, the service and the app
+        run: cargo build -p kh-cli -p kh-service -p keyholder-app
