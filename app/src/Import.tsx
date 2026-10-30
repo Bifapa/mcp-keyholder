@@ -51,7 +51,13 @@ function loadGroups(): GroupDef[] {
 
 /** What each approval level and delivery mode means — one block at the top of the page. */
 function Legend() {
-  const line = (rows: [string, string][]) => rows.map(([who, what]) => `${who}: ${what}.`).join(" ");
+  // One line per role: "Agent: …", then "You: …" (or "Risk: …").
+  const lines = (rows: [string, string][]) =>
+    rows.map(([who, what]) => (
+      <div key={who}>
+        <span className="legend-who">{who}:</span> {what}
+      </div>
+    ));
   return (
     <details className="card pad legend" open>
       <summary>What the approval levels and delivery modes mean</summary>
@@ -62,7 +68,7 @@ function Legend() {
             {TIERS.map((t) => (
               <Fragment key={t}>
                 <dt>{TIER_LABEL[t]}</dt>
-                <dd>{line(TIER_ROLES[t])}</dd>
+                <dd>{lines(TIER_ROLES[t])}</dd>
               </Fragment>
             ))}
           </dl>
@@ -73,7 +79,7 @@ function Legend() {
             {DELIVERY.map((m) => (
               <Fragment key={m}>
                 <dt>{MODE_INFO[m].title}</dt>
-                <dd>{line(MODE_ROLES[m === "env" ? "env" : "reveal"])}</dd>
+                <dd>{lines(MODE_ROLES[m === "env" ? "env" : "reveal"])}</dd>
               </Fragment>
             ))}
           </dl>

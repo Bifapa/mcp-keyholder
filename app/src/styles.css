@@ -1129,3 +1129,11 @@ input[type="checkbox"] {
   margin: 0;
   color: var(--ink-2);
 }
+
+.legend-who {
+  color: var(--muted);
+  font-weight: 600;
+}
+.legend dd > div + div {
+  margin-top: 2px;
+}
