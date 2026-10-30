@@ -336,10 +336,35 @@ pub struct Settings {
     /// Off by default; offered in Settings with a demo.
     #[serde(default)]
     pub noise_word: bool,
+    /// Colours of the noise word: 2 to 6 "#rrggbb" values, each cell takes one at random.
+    #[serde(default = "default_noise_colors")]
+    pub noise_colors: Vec<String>,
 }
 
 fn yes() -> bool {
     true
+}
+
+/// Four greys from near black to white.
+pub fn default_noise_colors() -> Vec<String> {
+    ["#1e1e1e", "#696969", "#b4b4b4", "#ffffff"].iter().map(|c| c.to_string()).collect()
+}
+
+/// The noise colours as 0x00RRGGBB, or None unless there are 2 to 6 valid "#rrggbb" values.
+pub fn parse_noise_colors(colors: &[String]) -> Option<Vec<u32>> {
+    if !(2..=6).contains(&colors.len()) {
+        return None;
+    }
+    colors
+        .iter()
+        .map(|c| {
+            let hex = c.strip_prefix('#')?;
+            if hex.len() != 6 {
+                return None;
+            }
+            u32::from_str_radix(hex, 16).ok()
+        })
+        .collect()
 }
 
 impl Default for Settings {
@@ -354,6 +379,7 @@ impl Default for Settings {
             secure_desktop: true,
             anchor_path: String::new(),
             noise_word: false,
+            noise_colors: default_noise_colors(),
         }
     }
 }
@@ -438,6 +464,10 @@ mod tests {
         assert!(!valid_sealed_name("почта  яндекс"));
         assert!(!valid_sealed_name("поч\u{202e}та"), "no bidi overrides");
         assert!(!valid_sealed_name("/почта"));
+        assert_eq!(parse_noise_colors(&default_noise_colors()), Some(vec![0x1e1e1e, 0x696969, 0xb4b4b4, 0xffffff]));
+        assert!(parse_noise_colors(&["#000000".into()]).is_none(), "at least two colours");
+        assert!(parse_noise_colors(&vec!["#000000".to_string(); 7]).is_none(), "at most six");
+        assert!(parse_noise_colors(&["#000000".into(), "red".into()]).is_none());
         assert_eq!(default_env_name("личное/почта"), "____________");
         assert_eq!(default_env_name("github/pipod-updates"), "GITHUB_PIPOD_UPDATES");
         assert!(valid_env_name("GH_TOKEN"));

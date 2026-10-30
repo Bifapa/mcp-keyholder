@@ -255,7 +255,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
     setError("");
     if (password.length < 10) return setError("The master password must be at least 10 characters.");
     if (password !== password2) return setError("The passwords don't match.");
-    if (word.trim().length < 3) return setError("The anti-phishing word must be at least 3 characters.");
+    if ([...word.trim()].length < 3 || [...word.trim()].length > 8) return setError("The anti-phishing word must be 3 to 8 characters.");
     setBusy(true);
     try {
       const r = await api.setupBegin(password, word);
@@ -305,8 +305,8 @@ export function Setup({ onDone }: { onDone: () => void }) {
               <PasswordInput autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
             </label>
             <label className="field">
-              Anti-phishing word
-              <input className="input" value={word} maxLength={32} onChange={(e) => setWord(e.target.value)} placeholder="e.g. owl" />
+              Anti-phishing word (3 to 8 characters)
+              <input className="input" value={word} maxLength={8} onChange={(e) => setWord(e.target.value)} placeholder="e.g. owl" />
               <span className="hint">It appears in every genuine MCP Keyholder approval window. No word — don't enter your code.</span>
             </label>
             {error && <p className="error">{error}</p>}

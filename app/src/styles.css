@@ -956,3 +956,32 @@ input[type="checkbox"] {
   background: var(--surface-2);
   border: 1px solid var(--line-soft);
 }
+
+.swatches {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.swatches span {
+  width: 9px;
+  height: 14px;
+}
+.btn.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.color-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.color-pick input[type="color"] {
+  width: 34px;
+  height: 28px;
+  padding: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}

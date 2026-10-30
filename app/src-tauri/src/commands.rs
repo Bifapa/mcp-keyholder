@@ -208,13 +208,16 @@ async fn settings_on(app: &AppHandle) -> bool {
     }
 }
 
-/// The "noise word" setting; off when it cannot be read (vault locked, service unreachable).
-async fn noise_word(app: &AppHandle) -> bool {
+/// The noise-word palette when the setting is on; None (plain word) when it is off or cannot be
+/// read (vault locked, service unreachable).
+async fn noise_word(app: &AppHandle) -> Option<Vec<u32>> {
     let st = app.state::<AppState>();
-    match st.call("get_settings", json!({})).await {
-        Ok(v) => v.get("noiseWord").and_then(|x| x.as_bool()).unwrap_or(false),
-        Err(_) => false,
+    let v = st.call("get_settings", json!({})).await.ok()?;
+    if !v.get("noiseWord").and_then(|x| x.as_bool()).unwrap_or(false) {
+        return None;
     }
+    let colors: Vec<String> = v.get("noiseColors").and_then(|c| serde_json::from_value(c.clone()).ok()).unwrap_or_default();
+    kh_core::parse_noise_colors(&colors).or_else(|| kh_core::parse_noise_colors(&kh_core::default_noise_colors()))
 }
 
 async fn antiphish(app: &AppHandle) -> String {

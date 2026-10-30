@@ -39,6 +39,7 @@ function Approve() {
   const [req, setReq] = useState<PendingView | null>(null);
   const [word, setWord] = useState("");
   const [noise, setNoise] = useState(false);
+  const [noiseColors, setNoiseColors] = useState<string[] | undefined>(undefined);
   const [queue, setQueue] = useState(0);
   const [hasPin, setHasPin] = useState(false);
   const [keep, setKeep] = useState<Set<string>>(new Set());
@@ -57,6 +58,7 @@ function Approve() {
       const r = await api.approvalCurrent();
       setWord(r.antiphish);
       setNoise(!!r.noiseWord && !reducedMotion());
+      setNoiseColors(r.noiseColors);
       setQueue(r.queue);
       setHasPin(r.hasPin);
       setReq(r.request);
@@ -172,7 +174,7 @@ function Approve() {
       {noise && (
         <div className="antiphish-block" title="Your anti-phishing word. If it's missing, this is not MCP Keyholder.">
           <span className="small muted">Anti-phishing word</span>
-          <NoiseWord word={word} height={56} />
+          <NoiseWord word={word} height={112} colors={noiseColors} />
         </div>
       )}
 

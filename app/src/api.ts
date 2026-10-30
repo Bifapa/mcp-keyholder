@@ -65,6 +65,8 @@ export interface Settings {
   anchorPath: string;
   /** Show the anti-phishing word as moving noise (off by default). */
   noiseWord: boolean;
+  /** Its colours: 2 to 6 "#rrggbb" values. */
+  noiseColors: string[];
 }
 
 export interface Preset {
@@ -273,7 +275,7 @@ export const api = {
     call<{ otpauthUri: string }>("recovery_used", { password, code }),
 
   approvalCurrent: () =>
-    call<{ request: PendingView | null; antiphish: string; queue: number; hasPin: boolean; noiseWord?: boolean }>("approval_current"),
+    call<{ request: PendingView | null; antiphish: string; queue: number; hasPin: boolean; noiseWord?: boolean; noiseColors?: string[] }>("approval_current"),
   approvalDecide: (args: {
     id: string;
     approve: boolean;

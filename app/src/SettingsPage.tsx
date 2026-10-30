@@ -12,7 +12,7 @@ import {
 } from "./api";
 import { useElevation, useStepUp } from "./stepup";
 import { Icon, LockedButton, PasswordInput, Segmented, useSecondsLeft } from "./ui";
-import { NoiseWord, reducedMotion } from "./noiseword";
+import { DEFAULT_NOISE_COLORS, NoiseWord, reducedMotion } from "./noiseword";
 import { UpdateSettings } from "./updates";
 import { exportVault, VaultFileImport } from "./vaultfile";
 
@@ -160,7 +160,12 @@ export function SettingsPage({ status }: { status: AppStatus }) {
             />
             Confirm PIN, OTP and password on a separate Windows desktop
           </label>
-          <NoiseOption on={s.noiseWord} onChange={(v) => edit({ noiseWord: v })} />
+          <NoiseOption
+            on={s.noiseWord}
+            colors={s.noiseColors?.length ? s.noiseColors : DEFAULT_NOISE_COLORS}
+            onChange={(v) => edit({ noiseWord: v })}
+            onColors={(c) => edit({ noiseColors: c })}
+          />
           <label className="field">
             Log anchor: file for the chain head (empty — off)
             <input
@@ -264,11 +269,43 @@ export function SettingsPage({ status }: { status: AppStatus }) {
   );
 }
 
-/** The noise-word option, off by default, offered with a live demo on a sample word. */
-function NoiseOption({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  const [demo, setDemo] = useState(false);
+/** Ready-made palettes for the noise word: 2, 3 and 4 greys, and a few colours. */
+const NOISE_PRESETS: { name: string; colors: string[] }[] = [
+  { name: "Black & white", colors: ["#000000", "#ffffff"] },
+  { name: "3 greys", colors: ["#000000", "#808080", "#ffffff"] },
+  { name: "4 greys", colors: DEFAULT_NOISE_COLORS },
+  { name: "Purple", colors: ["#140f26", "#4a3a9c", "#8f78f0", "#e6defd"] },
+  { name: "Amber", colors: ["#1a1000", "#7a4a00", "#e09a20", "#ffe2a8"] },
+  { name: "Green", colors: ["#001400", "#0a5a0a", "#2fbf2f", "#b9ffb9"] },
+];
+
+function Swatches({ colors }: { colors: string[] }) {
   return (
-    <div className="sub-panel col" style={{ gap: 8 }}>
+    <span className="swatches" aria-hidden="true">
+      {colors.map((c, i) => (
+        <span key={i} style={{ background: c }} />
+      ))}
+    </span>
+  );
+}
+
+/** The noise-word option, off by default, offered with palettes and a live demo on a sample word. */
+function NoiseOption({
+  on,
+  colors,
+  onChange,
+  onColors,
+}: {
+  on: boolean;
+  colors: string[];
+  onChange: (v: boolean) => void;
+  onColors: (c: string[]) => void;
+}) {
+  const [demo, setDemo] = useState(false);
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((c, i) => c.toLowerCase() === b[i].toLowerCase());
+  const setColor = (i: number, c: string) => onColors(colors.map((x, j) => (j === i ? c : x)));
+  return (
+    <div className="sub-panel col" style={{ gap: 10 }}>
       <label className="row small">
         <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
         Show the anti-phishing word as moving noise
@@ -277,6 +314,34 @@ function NoiseOption({ on, onChange }: { on: boolean; onChange: (v: boolean) => 
         The word is drawn with drifting noise: you read it in motion, while a screenshot or any single captured frame shows only
         noise. Approval windows are already hidden from screen capture; this also covers captures that get around that.
       </span>
+      <div className="col" style={{ gap: 6 }}>
+        <span className="field-title">Colours</span>
+        <div className="row wrap" style={{ gap: 6 }}>
+          {NOISE_PRESETS.map((p) => (
+            <button key={p.name} type="button" className={`btn sm ${same(p.colors, colors) ? "outline selected" : "outline"}`} onClick={() => onColors(p.colors)}>
+              <Swatches colors={p.colors} /> {p.name}
+            </button>
+          ))}
+        </div>
+        <div className="row wrap" style={{ gap: 8 }}>
+          {colors.map((c, i) => (
+            <span key={i} className="color-pick">
+              <input type="color" value={c} aria-label={`Colour ${i + 1}`} onChange={(e) => setColor(i, e.target.value)} />
+              {colors.length > 2 && (
+                <button type="button" className="link" aria-label={`Remove colour ${i + 1}`} onClick={() => onColors(colors.filter((_, j) => j !== i))}>
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+          {colors.length < 6 && (
+            <button type="button" className="link" onClick={() => onColors([...colors, "#808080"])}>
+              + Add colour
+            </button>
+          )}
+        </div>
+        <span className="hint">2 to 6 colours; each cell of the noise takes one at random. Colours far apart read best.</span>
+      </div>
       <button className="link" style={{ alignSelf: "flex-start" }} onClick={() => setDemo((v) => !v)} aria-expanded={demo}>
         {demo ? "Hide the demo" : "Show a demo"}
       </button>
@@ -286,7 +351,7 @@ function NoiseOption({ on, onChange }: { on: boolean; onChange: (v: boolean) => 
         ) : (
           <div className="antiphish-block">
             <span className="small muted">Demo — the word here is “sample”, not yours</span>
-            <NoiseWord word="sample" height={56} />
+            <NoiseWord word="sample" height={112} colors={colors} />
           </div>
         ))}
     </div>
@@ -381,7 +446,7 @@ function WordCard() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const len = [...word.trim()].length;
-  const ready = len >= 3 && len <= 32;
+  const ready = len >= 3 && len <= 8;
 
   const change = async () => {
     setError("");
@@ -407,12 +472,12 @@ function WordCard() {
         New word
         <input
           className="input"
-          maxLength={32}
+          maxLength={8}
           value={word}
           onChange={(e) => (setWord(e.target.value), setNote(""))}
           onKeyDown={(e) => e.key === "Enter" && ready && change()}
         />
-        <span className={`hint ${word && !ready ? "bad" : ""}`}>3 to 32 characters</span>
+        <span className={`hint ${word && !ready ? "bad" : ""}`}>3 to 8 characters — short words read best in the noise</span>
       </label>
       <div className="row wrap">
         <LockedButton disabled={!ready} onClick={change}>

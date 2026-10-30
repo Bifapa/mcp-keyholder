@@ -150,8 +150,8 @@ impl PendingSetup {
             return Err(Error::Invalid("the master password must be at least 10 characters long".into()));
         }
         let word = antiphish_word.trim();
-        if word.chars().count() < 3 || word.chars().count() > 32 {
-            return Err(Error::Invalid("anti-phishing word: 3 to 32 characters".into()));
+        if word.chars().count() < 3 || word.chars().count() > 8 {
+            return Err(Error::Invalid("anti-phishing word: 3 to 8 characters".into()));
         }
         let recovery = (0..10)
             .map(|_| {
@@ -704,6 +704,9 @@ impl Vault {
         }
         if s.login_mode == LoginMode::Pin && !self.has_pin() {
             return Err(Error::Invalid("set a PIN first".into()));
+        }
+        if parse_noise_colors(&s.noise_colors).is_none() {
+            return Err(Error::Invalid("noise colours: 2 to 6 colours as #rrggbb".into()));
         }
         self.meta_set_signed("settings", &serde_json::to_vec(s).expect("serialize"))?;
         // Readable while locked: startup has to know whether to restore the keys.
@@ -1409,8 +1412,8 @@ impl Vault {
 
     pub fn set_antiphish(&mut self, word: &str) -> Result<()> {
         let w = word.trim();
-        if w.chars().count() < 3 || w.chars().count() > 32 {
-            return Err(Error::Invalid("anti-phishing word: 3 to 32 characters".into()));
+        if w.chars().count() < 3 || w.chars().count() > 8 {
+            return Err(Error::Invalid("anti-phishing word: 3 to 8 characters".into()));
         }
         let blob = {
             let k = self.keys()?;

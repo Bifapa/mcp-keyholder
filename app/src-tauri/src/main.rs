@@ -109,7 +109,11 @@ fn desktop_test() {
         agent_note: None,
         antiphish: "test".into(),
         field: desktop::Field::Password,
-        noise: !std::env::args().any(|a| a == "--plain"),
+        noise: if std::env::args().any(|a| a == "--plain") {
+            None
+        } else {
+            kh_core::parse_noise_colors(&kh_core::default_noise_colors())
+        },
     });
     let report = format!(
         "available={} elapsed_ms={} result={}\n",

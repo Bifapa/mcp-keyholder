@@ -867,10 +867,10 @@ impl Daemon {
     // ---------- approval surface ----------
 
     fn approval_current(&self) -> CallResult {
-        let (antiphish, has_pin, noise_word) = {
+        let (antiphish, has_pin, noise_word, noise_colors) = {
             let v = self.vault();
-            let noise = v.settings().map(|s| s.noise_word).unwrap_or(false);
-            (v.antiphish_word().unwrap_or_default(), v.has_pin(), noise)
+            let s = v.settings().unwrap_or_default();
+            (v.antiphish_word().unwrap_or_default(), v.has_pin(), s.noise_word, s.noise_colors)
         };
         Ok(json!({
             "request": self.broker.current_shown(),
@@ -878,6 +878,7 @@ impl Daemon {
             "queue": self.broker.queue_len(),
             "hasPin": has_pin,
             "noiseWord": noise_word,
+            "noiseColors": noise_colors,
         }))
     }
 

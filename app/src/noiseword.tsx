@@ -5,7 +5,8 @@ import { useEffect, useRef } from "react";
 // letters to the right. Every single frame is uniform noise, so a still screen capture shows no
 // word; in motion the letters read easily. Drawn on a canvas: not in the accessibility tree.
 
-const GREYS = [30, 105, 180, 255];
+/** Four greys from near black to white — the default palette. */
+export const DEFAULT_NOISE_COLORS = ["#1e1e1e", "#696969", "#b4b4b4", "#ffffff"];
 const CELL = 2; // CSS pixels per noise cell
 const FRAME_MS = 40;
 
@@ -67,7 +68,13 @@ function textMask(word: string, w: number, h: number): Uint8Array | null {
   return mask;
 }
 
-export function NoiseWord({ word, height = 64 }: { word: string; height?: number }) {
+function rgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace("#", ""), 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export function NoiseWord({ word, height = 112, colors = DEFAULT_NOISE_COLORS }: { word: string; height?: number; colors?: string[] }) {
+  const palette = (colors.length >= 2 ? colors : DEFAULT_NOISE_COLORS).join(",");
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;
@@ -83,6 +90,7 @@ export function NoiseWord({ word, height = 64 }: { word: string; height?: number
     c.style.height = `${h * CELL}px`;
     const mask = textMask(word, w, h);
     if (!mask) return;
+    const pal = palette.split(",").map(rgb);
     const back = Float32Array.from({ length: w * h }, Math.random);
     const letters = Float32Array.from({ length: w * h }, Math.random);
     const img = ctx.createImageData(w, h);
@@ -96,10 +104,10 @@ export function NoiseWord({ word, height = 64 }: { word: string; height?: number
         for (let x = 0; x < w; x++) {
           const i = y * w + x;
           const v = mask[i] ? letters[y * w + ((x + w - shift) % w)] : back[y * w + ((x + shift) % w)];
-          const g = GREYS[Math.min(3, Math.floor(v * 4))];
-          img.data[i * 4] = g;
+          const [r, g, b] = pal[Math.min(pal.length - 1, Math.floor(v * pal.length))];
+          img.data[i * 4] = r;
           img.data[i * 4 + 1] = g;
-          img.data[i * 4 + 2] = g;
+          img.data[i * 4 + 2] = b;
           img.data[i * 4 + 3] = 255;
         }
       }
@@ -116,7 +124,7 @@ export function NoiseWord({ word, height = 64 }: { word: string; height?: number
     draw();
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [word, height]);
+  }, [word, height, palette]);
   return <canvas ref={ref} aria-hidden="true" style={{ display: "block", imageRendering: "pixelated", borderRadius: 8 }} />;
 }
 

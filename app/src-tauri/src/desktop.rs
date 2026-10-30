@@ -25,8 +25,9 @@ pub struct Prompt {
     pub agent_note: Option<String>,
     pub antiphish: String,
     pub field: Field,
-    /// Draw the anti-phishing word as moving noise (the "noise word" setting).
-    pub noise: bool,
+    /// Draw the anti-phishing word as moving noise in these colours (0x00RRGGBB); None draws it
+    /// as plain text.
+    pub noise: Option<Vec<u32>>,
 }
 
 pub struct Answer {
@@ -252,8 +253,6 @@ mod win {
     // Fine grain, big capitals and a steady drift keep the word readable in motion.
     const CELL: i32 = 2;
     const NOISE_MS: u32 = 40;
-    // Each cell takes one of these greys at random.
-    const GREYS: &[u32] = &[30, 105, 180, 255];
 
     struct Noise {
         w: usize,
@@ -262,6 +261,8 @@ mod win {
         /// Random grey levels in [0, 1).
         back: Vec<f32>,
         letters: Vec<f32>,
+        /// Cell colours, 0x00RRGGBB; each cell takes one at random.
+        palette: Vec<u32>,
         t: usize,
     }
 
@@ -273,7 +274,7 @@ mod win {
     impl Noise {
         /// None when Windows animations are off: moving noise would then be unreadable, so the
         /// word is drawn as plain text.
-        unsafe fn new(word: &str, area: RECT) -> Option<Noise> {
+        unsafe fn new(word: &str, area: RECT, palette: Vec<u32>) -> Option<Noise> {
             let mut animate: i32 = 1;
             SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &mut animate as *mut i32 as *mut c_void, 0);
             if animate == 0 {
@@ -296,7 +297,7 @@ mod win {
             };
             let back = (0..w * h).map(|_| next()).collect();
             let letters = (0..w * h).map(|_| next()).collect();
-            Some(Noise { w, h, mask, back, letters, t: 0 })
+            Some(Noise { w, h, mask, back, letters, palette, t: 0 })
         }
 
         fn frame(&self) -> Vec<u32> {
@@ -312,9 +313,9 @@ mod win {
                     } else {
                         self.back[y * w + (x + shift) % w] // drifts left
                     };
-                    // DIB pixels are 0x00RRGGBB; a grey has equal channels.
-                    let g = GREYS[((v * GREYS.len() as f32) as usize).min(GREYS.len() - 1)];
-                    px[i] = (g << 16) | (g << 8) | g;
+                    // DIB pixels are 0x00RRGGBB, the same form as the palette.
+                    let n = self.palette.len();
+                    px[i] = self.palette[((v * n as f32) as usize).min(n - 1)];
                 }
             }
             px
@@ -997,7 +998,7 @@ mod win {
 
             {
                 let mut g = UI.lock().unwrap_or_else(|e| e.into_inner());
-                let noise = if p.noise { Noise::new(&p.antiphish, word_rect(layout)) } else { None };
+                let noise = p.noise.and_then(|palette| Noise::new(&p.antiphish, word_rect(layout), palette));
                 *g = Some(Ui {
                     heading: p.heading,
                     facts: p.facts,
