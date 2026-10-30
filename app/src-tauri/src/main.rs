@@ -82,6 +82,7 @@ fn main() {
             commands::unlock_native,
             commands::login_native,
             commands::export_vault_file,
+            commands::save_vault_backup,
             commands::import_vault_native,
             commands::import_vault_file,
             commands::service_status,

@@ -201,6 +201,8 @@ fn hex(b: &[u8]) -> String {
 /// `.mcpkey`: magic, header length (u32 LE), header JSON, nonce, ciphertext of the database.
 /// The header is bound as AAD, so it cannot be swapped either.
 pub const EXPORT_MAGIC: &[u8; 8] = b"MCPKEY01";
+/// A plain database file: the backup offered before a reset.
+pub const SQLITE_MAGIC: &[u8; 16] = b"SQLite format 3\0";
 const EXPORT_INFO: &str = "mcpkey-export";
 
 #[derive(Serialize, Deserialize)]
@@ -344,6 +346,13 @@ impl Vault {
         Ok(out)
     }
 
+    /// Before a reset: the database as it is, still encrypted with the old master password (key
+    /// names and the log are readable, as in the vault file itself). Works while locked;
+    /// `import_file` takes it back once the password turns up.
+    pub fn backup_file(&self) -> Result<Zeroizing<Vec<u8>>> {
+        self.snapshot()
+    }
+
     /// A consistent copy of the database without the DPAPI wrap.
     fn snapshot(&self) -> Result<Zeroizing<Vec<u8>>> {
         let tmp = self.path.with_extension(format!("db.export-{}", now_ms()));
@@ -366,7 +375,8 @@ impl Vault {
     /// `password` (the master password the file was exported with). The current file is
     /// kept aside like on reset; returns its path (None when there was no vault yet).
     pub fn import_file(&mut self, data: &[u8], password: &str) -> Result<Option<PathBuf>> {
-        let db = read_export(data, password)?;
+        // A `.mcpkey` export, or a plain backup taken before a reset (checked below).
+        let db = if data.starts_with(SQLITE_MAGIC) { Zeroizing::new(data.to_vec()) } else { read_export(data, password)? };
         let path = self.path.clone();
         let tmp = path.with_extension(format!("db.import-{}", now_ms()));
         std::fs::write(&tmp, &db[..])?;
@@ -1913,6 +1923,22 @@ mod tests {
         assert!(backup.exists());
         assert_eq!(x.list_secrets().unwrap().len(), 1);
         assert_eq!(x.list_secrets().unwrap()[0].name, "gh/token");
+    }
+
+    #[test]
+    fn backup_before_reset_comes_back_with_the_old_password() {
+        let (_d, mut v) = setup();
+        let m = v.add_secret(new_key("old/key", Tier::Otp)).unwrap();
+        v.lock();
+        let backup = v.backup_file().unwrap();
+        assert!(backup.starts_with(SQLITE_MAGIC));
+        v.reset().unwrap();
+        let p = PendingSetup::new("another long password", "hedgehog").unwrap();
+        let code = totp::code_at_step(&p.seed, totp::step_at(now_ms() / 1000));
+        v.finish_setup(&p, &code).unwrap();
+        assert!(v.import_file(&backup, "wrong password!!").is_err());
+        v.import_file(&backup, "correct horse battery").unwrap();
+        assert_eq!(&*v.read_value(&m.id).unwrap(), "value-of-old/key-0123456789abcdef");
     }
 
     #[test]

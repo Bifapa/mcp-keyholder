@@ -75,7 +75,7 @@ function App() {
     );
   }
   if (!status.initialized) return <Setup onDone={refresh} />;
-  if (!status.unlocked) return <Unlock onDone={refresh} otpLockedUntil={status.otpLockedUntil} />;
+  if (!status.unlocked) return <Unlock onDone={refresh} otpLockedUntil={status.otpLockedUntil} service={status.runtime === "service"} />;
   if (status.uiLocked) return <Login mode={status.loginMode} onDone={refresh} />;
 
   const leaked = keys.filter((k) => k.leak).length;

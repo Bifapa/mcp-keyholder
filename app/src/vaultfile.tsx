@@ -19,6 +19,16 @@ export async function exportVault(run: Run): Promise<{ path: string; size: numbe
   return size === undefined ? null : { path, size };
 }
 
+/** Before a reset: asks where to save a copy of the current vault and writes it there. */
+export async function saveBackup(): Promise<string | null> {
+  const day = new Date().toISOString().slice(0, 10);
+  let path = await save({ title: "Save a copy of the vault", defaultPath: `mcp-keyholder-backup-${day}.mcpkey`, filters: [FILTER] });
+  if (!path) return null;
+  if (!/\.mcpkey$/i.test(path)) path += ".mcpkey";
+  await api.saveVaultBackup(path);
+  return path;
+}
+
 /**
  * Picks a `.mcpkey` file and loads it in place of the vault. The file's master password is
  * typed on the separate desktop; if that is off, a field appears here instead.

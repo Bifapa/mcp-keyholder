@@ -448,17 +448,35 @@ pub async fn export_vault_file(app: AppHandle, window: WebviewWindow, path: Stri
     let path = mcpkey_path(&path)?;
     let st = app.state::<AppState>();
     st.call("export_vault", json!({})).await?;
+    let data = download_transfer(&st).await?;
+    std::fs::write(&path, &data).map_err(|e| format!("could not write the file: {e}"))?;
+    Ok(data.len() as u64)
+}
+
+/// Before a reset: saves the vault as it is (still encrypted with the old master password) to
+/// `path`, so it can be loaded back if the password turns up. Portable mode only.
+#[tauri::command]
+pub async fn save_vault_backup(app: AppHandle, window: WebviewWindow, path: String) -> Res<u64> {
+    allow(&window, "backup_vault")?;
+    let path = mcpkey_path(&path)?;
+    let st = app.state::<AppState>();
+    st.call("backup_vault", json!({})).await?;
+    let data = download_transfer(&st).await?;
+    std::fs::write(&path, &data).map_err(|e| format!("could not write the file: {e}"))?;
+    Ok(data.len() as u64)
+}
+
+/// Reads a prepared export or backup from the core in chunks.
+async fn download_transfer(st: &AppState) -> Res<Vec<u8>> {
     let mut data = Vec::new();
     loop {
         let r = st.call("export_chunk", json!({ "offset": data.len() })).await?;
         let chunk = r.get("data").and_then(|x| x.as_str()).unwrap_or_default();
         data.extend(data_encoding::BASE64.decode(chunk.as_bytes()).map_err(|e| e.to_string())?);
         if r.get("done").and_then(|x| x.as_bool()).unwrap_or(true) {
-            break;
+            return Ok(data);
         }
     }
-    std::fs::write(&path, &data).map_err(|e| format!("could not write the file: {e}"))?;
-    Ok(data.len() as u64)
 }
 
 /// Before asking for the file's password: replacing an existing vault needs it open and a
@@ -481,7 +499,7 @@ async fn import_allowed(st: &AppState) -> Res<()> {
 async fn upload_mcpkey(st: &AppState, path: &str) -> Res<String> {
     let path = mcpkey_path(path)?;
     let data = std::fs::read(&path).map_err(|e| format!("could not read the file: {e}"))?;
-    if !data.starts_with(kh_core::vault::EXPORT_MAGIC) {
+    if !data.starts_with(kh_core::vault::EXPORT_MAGIC) && !data.starts_with(kh_core::vault::SQLITE_MAGIC) {
         return Err("this is not an MCP Keyholder vault file (.mcpkey)".into());
     }
     for (i, chunk) in data.chunks(MCPKEY_CHUNK).enumerate() {

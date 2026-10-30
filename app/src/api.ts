@@ -267,6 +267,8 @@ export const api = {
   reissueTotpCancel: () => call<void>("reissue_totp_cancel"),
   /** Whole vault as an encrypted `.mcpkey` file; returns its size in bytes. */
   exportVaultFile: (path: string) => invoke<number>("export_vault_file", { path }),
+  /** Before a reset: the vault as it is, still encrypted with the old master password. */
+  saveVaultBackup: (path: string) => invoke<number>("save_vault_backup", { path }),
   /** Replaces the vault with a `.mcpkey` file; the password is typed on the separate desktop. */
   importVaultNative: (path: string) => invoke<{ backup: string | null }>("import_vault_native", { path }),
   importVaultFile: (path: string, password: string) =>

@@ -84,6 +84,13 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
     });
   };
 
+  /** Takes a file off the list (nothing is deleted); its drafts go too. */
+  const removeFile = (i: number) => {
+    setFiles((fs) => fs.filter((_, j) => j !== i));
+    setDrafts((d) => d.filter((x) => x.file !== i).map((x) => (x.file > i ? { ...x, file: x.file - 1 } : x)));
+    setCur((c) => (c > i ? c - 1 : c === i ? Math.max(0, i - 1) : c));
+  };
+
   const upd = (i: number, patch: Partial<Draft>) => setDrafts((d) => d.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const setAll = (patch: Partial<Draft>) => setDrafts((d) => d.map((x) => ({ ...x, ...patch })));
 
@@ -158,22 +165,21 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
 
       {files.length > 0 && (
         <div className="row" style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-          <div className="card" role="list" aria-label="Files" style={{ flex: "1 1 220px", maxWidth: 260, padding: 6 }}>
+          <div className="card file-list" role="list" aria-label="Files">
             {files.map((x, i) => {
               const n = drafts.filter((d) => d.file === i).length;
               return (
-                <button
-                  key={x.path}
-                  role="listitem"
-                  className="row"
-                  onClick={() => setCur(i)}
-                  style={{ width: "100%", border: 0, cursor: "pointer", padding: "0 10px", minHeight: 42, borderRadius: 10, background: i === cur ? "var(--accent-row)" : "transparent", textAlign: "left" }}
-                >
-                  <span className="grow ellipsis" style={{ fontWeight: 500 }}>
-                    {x.fileName}
-                  </span>
-                  <span className={`pill ${x.error ? "danger" : n ? "accent" : "warn"}`}>{x.error ? "error" : n ? n : "review"}</span>
-                </button>
+                <div key={x.path} role="listitem" className={`file-row ${i === cur ? "on" : ""}`}>
+                  <button className="file-pick" onClick={() => setCur(i)}>
+                    <span className="grow ellipsis" style={{ fontWeight: 500 }}>
+                      {x.fileName}
+                    </span>
+                    <span className={`pill ${x.error ? "danger" : n ? "accent" : "warn"}`}>{x.error ? "error" : n ? n : "review"}</span>
+                  </button>
+                  <button className="file-remove" title="Remove from the list" aria-label={`Remove ${x.fileName} from the list`} onClick={() => removeFile(i)}>
+                    {Icon.close(14)}
+                  </button>
+                </div>
               );
             })}
           </div>

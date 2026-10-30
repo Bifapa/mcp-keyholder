@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { api, DESKTOP_OFF, errText, type LoginMode } from "./api";
 import logoUrl from "./assets/logo.svg";
-import { PasswordInput } from "./ui";
-import { VaultFileImport } from "./vaultfile";
+import { Icon, PasswordInput } from "./ui";
+import { saveBackup, VaultFileImport } from "./vaultfile";
 
 function Brand() {
   return (
@@ -16,7 +16,7 @@ function Brand() {
   );
 }
 
-export function Unlock({ onDone, otpLockedUntil }: { onDone: () => void; otpLockedUntil: number | null }) {
+export function Unlock({ onDone, otpLockedUntil, service }: { onDone: () => void; otpLockedUntil: number | null; service: boolean }) {
   const [password, setPassword] = useState("");
   const [manual, setManual] = useState(false);
   const [error, setError] = useState("");
@@ -86,16 +86,17 @@ export function Unlock({ onDone, otpLockedUntil }: { onDone: () => void; otpLock
             {busy ? "Unlocking…" : "Unlock"}
           </button>
         )}
-        <ResetVault onDone={onDone} />
+        <ResetVault onDone={onDone} service={service} />
       </div>
     </div>
   );
 }
 
 /** Lost master password: the vault cannot be decrypted, so the only way on is a fresh start. */
-function ResetVault({ onDone }: { onDone: () => void }) {
+function ResetVault({ onDone, service }: { onDone: () => void; service: boolean }) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
+  const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   if (!open) {
@@ -108,6 +109,15 @@ function ResetVault({ onDone }: { onDone: () => void }) {
       </p>
     );
   }
+  const backup = async () => {
+    setError("");
+    try {
+      const path = await saveBackup();
+      if (path) setSaved(path);
+    } catch (e) {
+      setError(errText(e));
+    }
+  };
   const reset = async () => {
     setBusy(true);
     setError("");
@@ -127,6 +137,28 @@ function ResetVault({ onDone }: { onDone: () => void }) {
         All keys, clients and the log will become unavailable: a new empty vault is created, and agents will need new tokens.
         The old file is not deleted — it stays next to the new one, encrypted, and opens with the old password if you remember it.
       </span>
+      {!service && (
+        <div className="col" style={{ gap: 6 }}>
+          <span className="small" style={{ fontWeight: 600 }}>
+            First, save a copy you can take with you
+          </span>
+          <div className="row wrap">
+            <button className="btn" onClick={backup}>
+              {Icon.download(15)} Save a copy…
+            </button>
+            {saved && (
+              <span className="ok-note">
+                {Icon.check(15)} Saved: {saved}
+              </span>
+            )}
+          </div>
+          <span className="hint">
+            If you remember the password later, load the copy with “Move a vault from a .mcpkey file” on the start screen, or in
+            Settings → Move vault. The values in it stay encrypted with the old password; key names and the log are readable, as in
+            the vault file itself.
+          </span>
+        </div>
+      )}
       <label className="field">
         Type RESET
         <input className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />

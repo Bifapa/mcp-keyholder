@@ -985,3 +985,55 @@ input[type="checkbox"] {
   background: var(--surface);
   cursor: pointer;
 }
+
+/* Import: the file list scrolls on its own and stays in view. */
+.file-list {
+  flex: 1 1 220px;
+  max-width: 280px;
+  padding: 6px;
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 10px;
+}
+.file-row.on {
+  background: var(--accent-row);
+}
+.file-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.file-remove {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.file-remove:hover {
+  background: var(--chip);
+  color: var(--ink);
+}

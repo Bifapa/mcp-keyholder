@@ -119,6 +119,7 @@ impl Daemon {
 
             // ---------- whole-vault file (.mcpkey) ----------
             "export_vault" => self.export_vault(),
+            "backup_vault" => self.backup_vault(),
             "export_chunk" => self.export_chunk(params),
             "import_chunk" => self.import_chunk(params),
             "import_vault" => self.import_vault(params),
@@ -786,6 +787,20 @@ impl Daemon {
         Ok(json!({ "size": size }))
     }
 
+    /// Before a reset (the password is forgotten, so no step-up is possible): the vault as it is,
+    /// still encrypted with the old master password; read it with `export_chunk`. Portable mode
+    /// only: there the file already sits in the user's own folder, while the service keeps it out
+    /// of reach of the user's programs on purpose.
+    fn backup_vault(&self) -> CallResult {
+        if self.runtime == Runtime::Service {
+            return Err("in service mode the old vault stays in the service folder after a reset".into());
+        }
+        let data = self.vault().backup_file().map_err(err_str)?;
+        let size = data.len();
+        self.transfer.lock().unwrap_or_else(|e| e.into_inner()).export = Some(data.to_vec());
+        Ok(json!({ "size": size }))
+    }
+
     fn export_chunk(&self, params: Value) -> CallResult {
         #[derive(Deserialize)]
         struct P {
@@ -852,13 +867,13 @@ impl Daemon {
         if data.is_empty() {
             return Err("no file uploaded".into());
         }
-        // Check the password before dropping grants and sessions of the current vault.
-        kh_core::vault::read_export(&data, &p.password).map_err(err_str)?;
+        // import_file checks the password before touching the current vault; grants and sessions
+        // of the old vault are dropped only once the new one is in place.
+        let backup = self.vault().import_file(&data, &p.password).map_err(err_str)?;
         self.elevated_until.store(0, Ordering::Relaxed);
         self.broker.clear_all("the vault was replaced");
         self.close_approval();
         *self.pending_setup.lock().unwrap_or_else(|e| e.into_inner()) = None;
-        let backup = self.vault().import_file(&data, &p.password).map_err(err_str)?;
         self.after_unlock();
         self.emit("vault");
         Ok(json!({ "backup": backup.map(|b| b.display().to_string()) }))
