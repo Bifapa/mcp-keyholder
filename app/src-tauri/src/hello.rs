@@ -35,7 +35,7 @@ pub fn verify(message: &str) -> Result<(), String> {
     use windows::Security::Credentials::UI::{UserConsentVerificationResult, UserConsentVerifier};
 
     if !available() {
-        return Err("Windows Hello не настроен на этом компьютере".into());
+        return Err("Windows Hello is not set up on this computer".into());
     }
     let msg = HSTRING::from(message);
     run(move || {
@@ -44,18 +44,18 @@ pub fn verify(message: &str) -> Result<(), String> {
         if r == UserConsentVerificationResult::Verified {
             Ok(())
         } else if r == UserConsentVerificationResult::Canceled {
-            Err("отменено".into())
+            Err("cancelled".into())
         } else if r == UserConsentVerificationResult::RetriesExhausted {
-            Err("слишком много попыток".into())
+            Err("too many attempts".into())
         } else {
-            Err("Windows Hello не подтвердил присутствие".into())
+            Err("Windows Hello did not confirm presence".into())
         }
     })
 }
 
 #[cfg(not(windows))]
 pub fn verify(_message: &str) -> Result<(), String> {
-    Err("Windows Hello есть только в Windows".into())
+    Err("Windows Hello is only available on Windows".into())
 }
 
 /// WinRT needs its own thread with a COM apartment, and the dialog must not block a runtime worker.
@@ -71,9 +71,9 @@ fn run<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static
             }
             let _ = tx.send(f());
         })
-        .map_err(|e| format!("не удалось запустить проверку присутствия: {e}"))?;
+        .map_err(|e| format!("could not start the presence check: {e}"))?;
     rx.recv_timeout(std::time::Duration::from_secs(120))
-        .map_err(|_| "Windows Hello не ответил".to_string())?
+        .map_err(|_| "Windows Hello did not respond".to_string())?
 }
 
 /// Waits for a WinRT operation by polling its status (no executor needed).
@@ -87,7 +87,7 @@ fn wait<T: windows::core::RuntimeType>(
         match op.Status().map_err(|e| e.message())? {
             AsyncStatus::Started => {
                 if std::time::Instant::now() > deadline {
-                    return Err("Windows Hello не ответил".into());
+                    return Err("Windows Hello did not respond".into());
                 }
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn availability_is_reported_without_a_dialog() {
         let a = super::available();
-        println!("Windows Hello доступен: {a}");
+        println!("Windows Hello available: {a}");
         // No assertion on the value: a machine without a PIN or face simply answers "no".
     }
 }

@@ -67,8 +67,8 @@ impl Ui {
         match tokio::time::timeout(Duration::from_secs(30), rx).await {
             Ok(Ok(Ok(v))) => Ok(v),
             Ok(Ok(Err(e))) => Err(anyhow::anyhow!("{e}")),
-            Ok(Err(_)) => Err(anyhow::anyhow!("канал интерфейса закрыт")),
-            Err(_) => Err(anyhow::anyhow!("таймаут вызова {method}")),
+            Ok(Err(_)) => Err(anyhow::anyhow!("interface channel closed")),
+            Err(_) => Err(anyhow::anyhow!("call {method} timed out")),
         }
     }
 }
@@ -76,19 +76,19 @@ impl Ui {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let sid = args.first().cloned().ok_or_else(|| anyhow::anyhow!("нужен SID владельца"))?;
+    let sid = args.first().cloned().ok_or_else(|| anyhow::anyhow!("owner SID required"))?;
     let password = args.get(1).cloned().unwrap_or_default();
     let seed = args.get(2).cloned().unwrap_or_default();
     let otp_key = args.get(3).cloned();
 
     let ui = Ui::connect(&sid).await?;
-    println!("до разблокировки: {}", ui.call("status", json!({})).await?);
+    println!("before unlock: {}", ui.call("status", json!({})).await?);
     if password == "login" {
         // Service mode: `login` opens the interface with the method from the settings.
         let credential = args.get(2).cloned().unwrap_or_default();
         let r = ui.call("login", json!({ "credential": credential })).await;
-        println!("вход: {r:?}");
-        println!("статус: {}", ui.call("status", json!({})).await?);
+        println!("login: {r:?}");
+        println!("status: {}", ui.call("status", json!({})).await?);
         return Ok(());
     }
     if password == "hello" {
@@ -111,24 +111,24 @@ async fn main() -> anyhow::Result<()> {
                         }),
                     )
                     .await;
-                println!("решение hello: {r:?}");
+                println!("hello decision: {r:?}");
                 return Ok(());
             }
             tokio::time::sleep(Duration::from_millis(400)).await;
         }
-        println!("запрос не пришёл");
+        println!("no request arrived");
         return Ok(());
     }
 
     if !password.is_empty() {
         ui.call("unlock", json!({ "password": password })).await?;
-        println!("после разблокировки: {}", ui.call("status", json!({})).await?);
+        println!("after unlock: {}", ui.call("status", json!({})).await?);
         let keys = ui.call("list_keys", json!({})).await?;
         let names: Vec<String> = keys["keys"]
             .as_array()
             .map(|a| a.iter().filter_map(|k| k["name"].as_str().map(str::to_string)).collect())
             .unwrap_or_default();
-        println!("ключи: {names:?}");
+        println!("keys: {names:?}");
     }
 
     if let Some(key) = otp_key {
@@ -141,7 +141,7 @@ async fn main() -> anyhow::Result<()> {
                     .as_array()
                     .map(|a| a.iter().filter_map(|k| k["name"].as_str().map(str::to_string)).collect())
                     .unwrap_or_default();
-                println!("запрос: {} · {}", req["client"], names.join(", "));
+                println!("request: {} · {}", req["client"], names.join(", "));
                 if names.iter().any(|n| n == &key) {
                     std::thread::sleep(Duration::from_millis(1600)); // the 1.5 s guard
                     let step = kh_core::totp::step_at(kh_core::now_ms() / 1000);
@@ -156,13 +156,13 @@ async fn main() -> anyhow::Result<()> {
                             }),
                         )
                         .await;
-                    println!("решение: {r:?}");
+                    println!("decision: {r:?}");
                     return Ok(());
                 }
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-        println!("запрос не пришёл");
+        println!("no request arrived");
     }
     Ok(())
 }

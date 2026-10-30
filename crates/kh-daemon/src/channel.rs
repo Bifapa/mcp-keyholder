@@ -41,8 +41,8 @@ pub async fn serve_agent(d: Arc<Daemon>, owner_sid: String) {
         Ok(s) => s,
         Err(e) => {
             d.set_pipe_alarm(Some(format!(
-                "Канал MCP Keyholder уже занят другим процессом ({e}). Агенты не смогут подключиться. \
-                 Если MCP Keyholder не запущен второй раз, кто-то может выдавать себя за MCP Keyholder — проверьте компьютер."
+                "The MCP Keyholder channel is already taken by another process ({e}). Agents cannot connect. \
+                 If MCP Keyholder is not running twice, something may be impersonating MCP Keyholder: check this computer."
             )));
             return;
         }
@@ -79,7 +79,7 @@ pub async fn serve_ui(d: Arc<Daemon>, owner_sid: String, events: UiEvents) {
         Ok(s) => s,
         Err(e) => {
             d.set_pipe_alarm(Some(format!(
-                "Канал интерфейса MCP Keyholder уже занят другим процессом ({e}). Приложение не сможет подключиться к службе."
+                "The MCP Keyholder interface channel is already taken by another process ({e}). The app cannot connect to the service."
             )));
             return;
         }
@@ -118,7 +118,7 @@ pub async fn serve_agent(d: Arc<Daemon>, _owner_sid: String) {
     let listener = match tokio::net::UnixListener::bind(&path) {
         Ok(l) => l,
         Err(e) => {
-            d.set_pipe_alarm(Some(format!("Не удалось открыть сокет MCP Keyholder: {e}")));
+            d.set_pipe_alarm(Some(format!("Could not open the MCP Keyholder socket: {e}")));
             return;
         }
     };
@@ -191,13 +191,13 @@ async fn handle_agent_conn<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(d
         return;
     };
     let Ok(ClientMsg::Hello { protocol, token, purpose, .. }) = serde_json::from_str::<ClientMsg>(&line) else {
-        let _ = tx.send(ServerMsg::Fatal { message: "ожидалось приветствие".into() });
+        let _ = tx.send(ServerMsg::Fatal { message: "expected hello".into() });
         drop(tx);
         let _ = writer.await;
         return;
     };
     if protocol != PROTOCOL_VERSION {
-        let _ = tx.send(ServerMsg::Fatal { message: format!("версия протокола {protocol} не поддерживается, нужна {PROTOCOL_VERSION}") });
+        let _ = tx.send(ServerMsg::Fatal { message: format!("protocol version {protocol} is not supported, expected {PROTOCOL_VERSION}") });
         drop(tx);
         let _ = writer.await;
         return;
@@ -250,7 +250,7 @@ async fn handle_agent_conn<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(d
                 });
             }
             Ok(ClientMsg::Hello { .. }) | Err(_) => {
-                let _ = tx.send(ServerMsg::Fatal { message: "неверное сообщение".into() });
+                let _ = tx.send(ServerMsg::Fatal { message: "invalid message".into() });
                 break;
             }
         }
@@ -282,13 +282,13 @@ async fn handle_ui_conn<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(d: A
         return;
     };
     let Ok(ClientMsg::Hello { protocol, purpose, .. }) = serde_json::from_str::<ClientMsg>(&line) else {
-        let _ = tx.send(ServerMsg::Fatal { message: "ожидалось приветствие".into() });
+        let _ = tx.send(ServerMsg::Fatal { message: "expected hello".into() });
         drop(tx);
         let _ = writer.await;
         return;
     };
     if protocol != PROTOCOL_VERSION || purpose != "ui" {
-        let _ = tx.send(ServerMsg::Fatal { message: "этот канал только для интерфейса MCP Keyholder".into() });
+        let _ = tx.send(ServerMsg::Fatal { message: "this channel is only for the MCP Keyholder interface".into() });
         drop(tx);
         let _ = writer.await;
         return;
@@ -340,7 +340,7 @@ async fn handle_ui_conn<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(d: A
             }
             Ok(ClientMsg::ClientInfo { .. }) => {}
             Ok(ClientMsg::Hello { .. }) | Err(_) => {
-                let _ = tx.send(ServerMsg::Fatal { message: "неверное сообщение".into() });
+                let _ = tx.send(ServerMsg::Fatal { message: "invalid message".into() });
                 break;
             }
         }

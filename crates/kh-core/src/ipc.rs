@@ -155,7 +155,7 @@ mod win {
                 Err(e) => return Err(e),
             }
         }
-        Err(io::Error::new(io::ErrorKind::TimedOut, "канал MCP Keyholder занят"))
+        Err(io::Error::new(io::ErrorKind::TimedOut, "the MCP Keyholder pipe is busy"))
     }
 
     /// Owner (user) SID of a process, e.g. `S-1-5-21-...` or `S-1-5-80-...` for a service account.
@@ -376,7 +376,7 @@ mod unix {
 /// Human-readable name for an io error from `connect`.
 pub fn describe_connect_error(e: &io::Error) -> String {
     match e.kind() {
-        io::ErrorKind::NotFound => "MCP Keyholder не запущен".to_string(),
-        _ => format!("не удалось подключиться к MCP Keyholder: {e}"),
+        io::ErrorKind::NotFound => "MCP Keyholder is not running".to_string(),
+        _ => format!("could not connect to MCP Keyholder: {e}"),
     }
 }

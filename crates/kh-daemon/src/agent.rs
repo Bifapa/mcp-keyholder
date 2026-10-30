@@ -30,7 +30,7 @@ async fn ensure_unlocked(d: &Daemon) -> Result<(), String> {
         return Ok(());
     }
     if !d.vault().is_initialized() {
-        return Err("MCP Keyholder ещё не настроен: откройте приложение и создайте хранилище".into());
+        return Err("MCP Keyholder is not set up yet: ask the human to open the MCP Keyholder app and create a vault".into());
     }
     d.show_main();
     d.emit("unlock-needed");
@@ -38,39 +38,39 @@ async fn ensure_unlocked(d: &Daemon) -> Result<(), String> {
     if d.vault().is_unlocked() {
         Ok(())
     } else {
-        Err("locked: хранилище MCP Keyholder заблокировано — попросите человека разблокировать его".into())
+        Err("locked: the MCP Keyholder vault is locked. Ask the human to unlock it in the MCP Keyholder app, then try again".into())
     }
 }
 
 /// Authenticates the session's client token (lazily, because the vault may have been locked at hello).
 fn ensure_client(d: &Daemon, session: &str) -> Result<SessionInfo, String> {
-    let s = d.broker.session(session).ok_or("сессия не найдена")?;
+    let s = d.broker.session(session).ok_or("session not found")?;
     if s.client_id.is_some() {
         let c = d.vault().list_clients().map_err(|e| e.to_string())?;
         let c = c.into_iter().find(|c| Some(&c.id) == s.client_id.as_ref());
         return match c {
-            Some(c) if c.revoked => Err("клиент отозван".into()),
-            Some(c) if c.blocked => Err("клиент заблокирован — человек может снять блокировку в MCP Keyholder → Клиенты".into()),
+            Some(c) if c.revoked => Err("client revoked: ask the human to add a new client in MCP Keyholder → Clients and update KH_TOKEN".into()),
+            Some(c) if c.blocked => Err("client blocked: only the human can unblock it, in MCP Keyholder → Clients".into()),
             Some(_) => Ok(s),
-            None => Err("клиент удалён".into()),
+            None => Err("client deleted: ask the human to add a new client in MCP Keyholder → Clients and update KH_TOKEN".into()),
         };
     }
     let token = s.token.clone().ok_or(
-        "нет токена клиента: добавьте клиента в MCP Keyholder → Клиенты и передайте его токен в переменной KH_TOKEN",
+        "no client token: ask the human to add a client in MCP Keyholder → Clients and pass its token in the KH_TOKEN environment variable",
     )?;
     let client = d.vault().auth_client(&token).map_err(|e| e.to_string())?;
     let Some(c) = client else {
-        return Err("токен клиента не принят: добавьте клиента в MCP Keyholder → Клиенты и обновите KH_TOKEN".into());
+        return Err("client token rejected: ask the human to add a client in MCP Keyholder → Clients and update KH_TOKEN".into());
     };
     if c.blocked {
-        return Err("клиент заблокирован — человек может снять блокировку в MCP Keyholder → Клиенты".into());
+        return Err("client blocked: only the human can unblock it, in MCP Keyholder → Clients".into());
     }
     let _ = d.vault().touch_client(&c.id);
     d.broker.update_session(session, |x| {
         x.client_id = Some(c.id.clone());
         x.client = c.name.clone();
     });
-    d.broker.session(session).ok_or_else(|| "сессия не найдена".into())
+    d.broker.session(session).ok_or_else(|| "session not found".into())
 }
 
 fn status_of(m: &SecretMeta) -> &'static str {
@@ -93,18 +93,18 @@ fn meta_by_name(d: &Daemon, name: &str) -> Result<SecretMeta, String> {
         .map_err(|e| e.to_string())?
         .into_iter()
         .find(|m| m.name == name)
-        .ok_or_else(|| format!("ключа «{name}» нет в MCP Keyholder (см. list_secrets)"))
+        .ok_or_else(|| format!("key \"{name}\" is not in MCP Keyholder (call list_secrets to see the available keys)"))
 }
 
 fn usable(m: &SecretMeta) -> Result<(), String> {
     if m.quarantined {
-        return Err(format!("ключ «{}» не прошёл проверку целостности и заблокирован", m.name));
+        return Err(format!("key \"{}\" failed the integrity check and is blocked", m.name));
     }
     if m.status == KeyStatus::Disabled {
-        return Err(format!("ключ «{}» отключён", m.name));
+        return Err(format!("key \"{}\" is disabled", m.name));
     }
     if m.tier == Tier::Sealed {
-        return Err(format!("ключ «{}» запечатан и агентам не выдаётся", m.name));
+        return Err(format!("key \"{}\" is sealed and is never given to agents", m.name));
     }
     Ok(())
 }
@@ -112,11 +112,11 @@ fn usable(m: &SecretMeta) -> Result<(), String> {
 /// Short reason for the approval window's "removed" list.
 fn short_unusable(m: &SecretMeta) -> Option<&'static str> {
     if m.quarantined {
-        Some("ошибка целостности")
+        Some("integrity error")
     } else if m.status == KeyStatus::Disabled {
-        Some("отключён")
+        Some("disabled")
     } else if m.tier == Tier::Sealed {
-        Some("запечатан, убран")
+        Some("sealed, removed")
     } else {
         None
     }
@@ -145,14 +145,14 @@ fn auto_grant(d: &Daemon, s: &SessionInfo, m: &SecretMeta) -> Grant {
         client: s.client.clone(),
         process: s.process.clone(),
         keys: vec![GrantKey { id: m.id.clone(), name: m.name.clone(), mode: m.mode, tier: m.tier }],
-        reason: "автоматически (уровень «Без окна»)".into(),
+        reason: "automatic (level \"No window\")".into(),
         level: Tier::Auto,
         created_at: now_ms(),
         expires_at: now_ms() + ttl * 60_000,
         uses: 0,
     };
     d.broker.add_grant(g.clone());
-    log(d, s, "grant", &m.name, "auto", format!("на {ttl} мин"));
+    log(d, s, "grant", &m.name, "auto", format!("for {ttl} min"));
     g
 }
 
@@ -167,9 +167,9 @@ fn covering_grant(d: &Daemon, s: &SessionInfo, m: &SecretMeta) -> Result<GrantKe
             return Ok(k);
         }
     }
-    log(d, s, "access", &m.name, "denied", "нет в разрешении");
+    log(d, s, "access", &m.name, "denied", "not in grant");
     Err(format!(
-        "not_in_grant: ключа «{}» нет в ваших разрешениях — сначала вызовите request_grant",
+        "not_in_grant: key \"{}\" is not in your grants. Call request_grant for it first",
         m.name
     ))
 }
@@ -194,7 +194,7 @@ impl Daemon {
             return redeem_ticket(d, session, params);
         }
         if purpose == "run" {
-            return Err("этот канал только для kh run --ticket".into());
+            return Err("this channel is only for kh run --ticket".into());
         }
 
         ensure_unlocked(d).await?;
@@ -207,7 +207,7 @@ impl Daemon {
             m::PREPARE_RUN => prepare_run(d, &s, params),
             m::REPORT_LEAK => report_leak(d, &s, params),
             m::CHECK_LEAK => check_leak(d, &s, params),
-            _ => Err(format!("неизвестный метод {method}")),
+            _ => Err(format!("unknown method {method}")),
         }
     }
 
@@ -259,7 +259,7 @@ fn list_secrets(d: &Daemon, s: &SessionInfo, params: Value) -> R {
             })
         })
         .collect();
-    log(d, s, "list_secrets", "*", "ok", format!("{} ключей", items.len()));
+    log(d, s, "list_secrets", "*", "ok", format!("{} keys", items.len()));
     Ok(json!({
         "secrets": items,
         "howTo": "Call request_grant with the keys you need (one request for everything). Tier auto is granted automatically; soft/otp show a confirmation window to the human. Then use get_secret (mode reveal) or prepare_run (mode env).",
@@ -283,15 +283,15 @@ struct GrantParams {
 }
 
 async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
-    let mut p: GrantParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
+    let mut p: GrantParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
     let reason = sanitize_untrusted(p.reason.as_deref().unwrap_or(""), 200);
     if reason.is_empty() {
-        return Err("укажите reason — коротко и честно, зачем нужны ключи".into());
+        return Err("reason is required: say briefly and honestly why you need the keys".into());
     }
     if let Some(name) = &p.preset {
         let presets = d.vault().presets().map_err(|e| e.to_string())?;
         let Some(pr) = presets.iter().find(|x| &x.name == name) else {
-            return Ok(json!({"status": "denied", "message": format!("пресета «{name}» нет: человек сохраняет их в окне подтверждения")}));
+            return Ok(json!({"status": "denied", "message": format!("preset \"{name}\" does not exist (the human saves presets in the approval window): request the keys by name instead")}));
         };
         for k in &pr.keys {
             if !p.keys.iter().any(|x| &x.name == k) {
@@ -303,15 +303,15 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
         }
     }
     if p.keys.is_empty() || p.keys.len() > 32 {
-        return Err("keys: от 1 до 32 ключей (или укажите preset)".into());
+        return Err("keys: pass 1 to 32 keys (or a preset)".into());
     }
     if s.blocked_until > now_ms() {
-        log(d, s, "request_grant", "*", "denied", "сессия заблокирована");
-        return Ok(json!({"status": "denied", "message": "Сессия временно заблокирована человеком."}));
+        log(d, s, "request_grant", "*", "denied", "session blocked");
+        return Ok(json!({"status": "denied", "message": "This session is temporarily blocked by the human. Do not retry right away."}));
     }
     if !d.broker.rate_ok(&format!("grant:{}", s.client), 5, 60_000) {
-        log(d, s, "request_grant", "*", "rate_limited", "больше 5 запросов в минуту");
-        return Ok(json!({"status": "rate_limited", "message": "Не больше 5 запросов в минуту. Объедините ключи в один запрос."}));
+        log(d, s, "request_grant", "*", "rate_limited", "more than 5 requests per minute");
+        return Ok(json!({"status": "rate_limited", "message": "No more than 5 requests per minute. Put all the keys you need into one request."}));
     }
     let metas = d.vault().list_secrets().map_err(|e| e.to_string())?;
     let settings = d.vault().settings().map_err(|e| e.to_string())?;
@@ -323,7 +323,7 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
             continue;
         }
         let Some(m) = metas.iter().find(|m| m.name == name) else {
-            removed.push(Removed { name, why: "нет такого ключа".into() });
+            removed.push(Removed { name, why: "no such key".into() });
             continue;
         };
         if let Some(why) = short_unusable(m) {
@@ -332,7 +332,7 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
         }
         if let Some(mode) = k.mode {
             if mode != m.mode {
-                removed.push(Removed { name, why: format!("только режим {}", m.mode.as_str()) });
+                removed.push(Removed { name, why: format!("{} mode only", m.mode.as_str()) });
                 continue;
             }
         }
@@ -340,8 +340,8 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
     }
     let removed_json = serde_json::to_value(&removed).unwrap_or_default();
     if keys.is_empty() {
-        log(d, s, "request_grant", "*", "denied", "нет подходящих ключей");
-        return Ok(json!({"status": "denied", "message": "Ни один ключ не подходит.", "removed": removed_json}));
+        log(d, s, "request_grant", "*", "denied", "no usable keys");
+        return Ok(json!({"status": "denied", "message": "None of the requested keys can be granted; see removed for the reasons.", "removed": removed_json}));
     }
     let ttl = p.ttl_minutes.unwrap_or(settings.default_ttl_minutes).clamp(1, settings.max_ttl_minutes);
     let level = keys.iter().map(|k| k.tier).max().unwrap_or(Tier::Auto);
@@ -361,7 +361,7 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
             uses: 0,
         };
         d.broker.add_grant(g.clone());
-        log(d, s, "grant", &names, "auto", format!("на {ttl} мин · {reason}"));
+        log(d, s, "grant", &names, "auto", format!("for {ttl} min · {reason}"));
         d.emit("grants");
         let mut v = grant_json(&g);
         v["status"] = json!("granted");
@@ -396,10 +396,10 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
     match d.broker.enqueue(view.clone(), signature, tx) {
         Enqueue::New | Enqueue::Joined => {}
         Enqueue::Busy => {
-            return Ok(json!({"status": "pending", "message": "Предыдущий запрос этой сессии ещё ждёт решения человека."}));
+            return Ok(json!({"status": "pending", "message": "An earlier request from this session is still waiting for the human. Wait for it to finish, then check my_grants."}));
         }
     }
-    log(d, s, "request_grant", &names, "pending", format!("{} · {ttl} мин · {reason}", level.as_str()));
+    log(d, s, "request_grant", &names, "pending", format!("{} · {ttl} min · {reason}", level.as_str()));
     d.show_approval();
     d.emit("approvals");
 
@@ -411,18 +411,18 @@ async fn request_grant(d: &Daemon, s: &SessionInfo, params: Value) -> R {
             Ok(v)
         }
         Ok(Ok(Outcome::Denied(why))) => Ok(json!({"status": "denied", "message": why, "removed": removed_json})),
-        Ok(Err(_)) => Ok(json!({"status": "denied", "message": "запрос отменён"})),
+        Ok(Err(_)) => Ok(json!({"status": "denied", "message": "request cancelled"})),
         Err(_) => {
             let was_front = d.broker.front_id().as_deref() == Some(id.as_str());
             d.broker.drop_request(&id);
-            log(d, s, "request_grant", &names, "timeout", "человек не ответил");
+            log(d, s, "request_grant", &names, "timeout", "the human did not respond");
             if was_front {
                 if d.broker.queue_len() == 0 {
                     d.close_approval();
                 }
                 d.emit("approvals");
             }
-            Ok(json!({"status": "timeout", "message": "Человек не ответил за 3 минуты. Если окно всё ещё открыто, решение применится к этой сессии — проверьте my_grants."}))
+            Ok(json!({"status": "timeout", "message": "The human did not respond within 3 minutes. If the approval window is still open, the decision will still apply to this session: check my_grants."}))
         }
     }
 }
@@ -433,22 +433,22 @@ struct NameParams {
 }
 
 fn get_secret(d: &Daemon, s: &SessionInfo, params: Value) -> R {
-    let p: NameParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
+    let p: NameParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
     let m = meta_by_name(d, &p.name)?;
     usable(&m)?;
     if m.mode != Mode::Reveal {
-        log(d, s, "get_secret", &m.name, "denied", format!("режим {}", m.mode.as_str()));
+        log(d, s, "get_secret", &m.name, "denied", format!("{} mode", m.mode.as_str()));
         return Err(format!(
-            "ключ «{}» выдаётся в режиме {}: значение агенту не отдаётся{}",
+            "key \"{}\" is in {} mode, so its value is never returned to agents{}",
             m.name,
             m.mode.as_str(),
-            if m.mode == Mode::Env { " — используйте prepare_run и kh run" } else { "" }
+            if m.mode == Mode::Env { ": use prepare_run and kh run instead" } else { "" }
         ));
     }
     covering_grant(d, s, &m)?;
     let value = d.vault().read_value(&m.id).map_err(|e| e.to_string())?;
     let _ = d.vault().touch_use(&m.id);
-    let _ = d.vault().add_leak(&m.id, LeakKind::Exposed, &s.client, &s.id, "выдан в режиме reveal");
+    let _ = d.vault().add_leak(&m.id, LeakKind::Exposed, &s.client, &s.id, "given out in reveal mode");
     log(d, s, "get_secret", &m.name, "ok", "reveal");
     d.emit("vault");
     Ok(json!({
@@ -465,9 +465,9 @@ struct RunParams {
 }
 
 fn prepare_run(d: &Daemon, s: &SessionInfo, params: Value) -> R {
-    let p: RunParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
+    let p: RunParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
     if p.keys.is_empty() || p.keys.len() > 32 {
-        return Err("keys: от 1 до 32 ключей".into());
+        return Err("keys: pass 1 to 32 keys".into());
     }
     let mut ids = Vec::new();
     let mut env = BTreeMap::new();
@@ -475,7 +475,7 @@ fn prepare_run(d: &Daemon, s: &SessionInfo, params: Value) -> R {
         let m = meta_by_name(d, name)?;
         usable(&m)?;
         if m.mode != Mode::Env {
-            return Err(format!("ключ «{}» в режиме {}, а не env", m.name, m.mode.as_str()));
+            return Err(format!("key \"{}\" is in {} mode, not env: use get_secret for it", m.name, m.mode.as_str()));
         }
         covering_grant(d, s, &m)?;
         ids.push(m.id.clone());
@@ -483,7 +483,7 @@ fn prepare_run(d: &Daemon, s: &SessionInfo, params: Value) -> R {
     }
     let ticket = BASE32_NOPAD.encode(&crypto::random_bytes::<20>()).to_lowercase();
     d.broker.add_ticket(ticket.clone(), Ticket { session: s.id.clone(), key_ids: ids, expires_at: now_ms() + TICKET_MS });
-    log(d, s, "prepare_run", &p.keys.join(", "), "ok", "билет на 60 с");
+    log(d, s, "prepare_run", &p.keys.join(", "), "ok", "ticket for 60 s");
     let cmd = sanitize_untrusted(p.command.as_deref().unwrap_or("<command> [args]"), 500);
     Ok(json!({
         "ticket": ticket,
@@ -500,26 +500,26 @@ struct TicketParams {
 }
 
 fn redeem_ticket(d: &Daemon, session: &str, params: Value) -> R {
-    let p: TicketParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
-    let runner = d.broker.session(session).ok_or("сессия не найдена")?;
-    let t = d.broker.take_ticket(p.ticket.trim()).ok_or("билет недействителен, истёк или уже использован")?;
-    let owner = d.broker.session(&t.session).ok_or("сессия, получившая билет, закрыта")?;
+    let p: TicketParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
+    let runner = d.broker.session(session).ok_or("session not found")?;
+    let t = d.broker.take_ticket(p.ticket.trim()).ok_or("ticket is invalid, expired or already used: call prepare_run again")?;
+    let owner = d.broker.session(&t.session).ok_or("the session that received the ticket has closed")?;
     let mut env = serde_json::Map::new();
     let mut names = Vec::new();
     for id in &t.key_ids {
         let m = d.vault().get_meta(id).map_err(|e| e.to_string())?;
         usable(&m)?;
         if m.mode != Mode::Env {
-            return Err(format!("ключ «{}» больше не в режиме env", m.name));
+            return Err(format!("key \"{}\" is no longer in env mode", m.name));
         }
         covering_grant(d, &owner, &m)?;
         let v = d.vault().read_value(id).map_err(|e| e.to_string())?;
         env.insert(m.env_name.clone(), json!(v.as_str()));
         let _ = d.vault().touch_use(id);
-        let _ = d.vault().add_leak(id, LeakKind::Exposed, &owner.client, &owner.id, "выдан в режиме env (kh run)");
+        let _ = d.vault().add_leak(id, LeakKind::Exposed, &owner.client, &owner.id, "given out in env mode (kh run)");
         names.push(m.name);
     }
-    log(d, &owner, "kh_run", &names.join(", "), "ok", format!("процесс: {}", runner.process));
+    log(d, &owner, "kh_run", &names.join(", "), "ok", format!("process: {}", runner.process));
     d.emit("vault");
     Ok(json!({ "env": env }))
 }
@@ -531,14 +531,14 @@ struct LeakParams {
 }
 
 fn report_leak(d: &Daemon, s: &SessionInfo, params: Value) -> R {
-    let p: LeakParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
+    let p: LeakParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
     if !d.broker.rate_ok(&format!("leak:{}", s.id), 10, 3_600_000) {
-        return Err("не больше 10 сообщений об утечке в час".into());
+        return Err("no more than 10 leak reports per hour".into());
     }
     let comment = sanitize_untrusted(p.comment.as_deref().unwrap_or(""), 500);
     let Ok(m) = meta_by_name(d, &p.name) else {
         log(d, s, "report_leak", &sanitize_untrusted(&p.name, 64), "unknown_key", comment);
-        return Ok(json!({"ok": false, "message": "Такого ключа нет в MCP Keyholder; сообщение записано в журнал."}));
+        return Ok(json!({"ok": false, "message": "There is no such key in MCP Keyholder; the report was written to the audit log."}));
     };
     d.vault().add_leak(&m.id, LeakKind::Reported, &s.client, &s.id, &comment).map_err(|e| e.to_string())?;
     if d.vault().settings().map(|x| x.disable_on_leak_report).unwrap_or(false) {
@@ -558,20 +558,20 @@ struct CheckParams {
 }
 
 fn check_leak(d: &Daemon, s: &SessionInfo, params: Value) -> R {
-    let p: CheckParams = serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))?;
+    let p: CheckParams = serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))?;
     if p.text.len() > CHECK_LEAK_MAX {
-        return Err("текст больше 1 МБ — разбейте на части".into());
+        return Err("text is larger than 1 MB: split it into parts".into());
     }
     let limit = if s.purpose == "scan" { 500 } else { 20 };
     if !d.broker.rate_ok(&format!("check:{}", s.id), limit, 3_600_000) {
-        return Err(format!("не больше {limit} проверок в час"));
+        return Err(format!("no more than {limit} checks per hour"));
     }
     let hits = d.vault().scan_text(&p.text).map_err(|e| e.to_string())?;
     for (id, _) in &hits {
-        let _ = d.vault().add_leak(id, LeakKind::Found, &s.client, &s.id, "значение найдено в тексте, присланном на проверку");
+        let _ = d.vault().add_leak(id, LeakKind::Found, &s.client, &s.id, "value found in text sent for checking");
     }
     let names: Vec<String> = hits.into_iter().map(|(_, n)| n).collect();
-    log(d, s, "check_leak", &format!("{} байт", p.text.len()), if names.is_empty() { "clean" } else { "found" }, names.join(", "));
+    log(d, s, "check_leak", &format!("{} bytes", p.text.len()), if names.is_empty() { "clean" } else { "found" }, names.join(", "));
     if !names.is_empty() {
         d.emit("leak");
     }

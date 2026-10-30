@@ -87,7 +87,7 @@ export function StepUpProvider({ children, elevatedUntil = 0 }: { children: Reac
       setCode("");
       close(true);
     } catch (e) {
-      setError(errText(e) === "stepup_required" ? "Сначала подтвердите пароль и код." : errText(e));
+      setError(errText(e) === "stepup_required" ? "Confirm your password and code first." : errText(e));
     } finally {
       setBusy(false);
     }
@@ -97,12 +97,12 @@ export function StepUpProvider({ children, elevatedUntil = 0 }: { children: Reac
     <Ctx.Provider value={run}>
       <UntilCtx.Provider value={{ until, end }}>{children}</UntilCtx.Provider>
       {open && (
-        <Modal title="Повышение прав" onClose={() => close(false)}>
+        <Modal title="Confirm it's you" onClose={() => close(false)}>
           <p className="muted small">
-            Показ и копирование значений, смена защиты и клиентов требуют мастер-пароль и код из аутентификатора. Права действуют 3 минуты.
+            Showing or copying values and changing protection or clients need your master password and authenticator code. The confirmation lasts 3 minutes.
           </p>
           <label className="field">
-            Мастер-пароль
+            Master password
             <PasswordInput
               autoFocus
               autoComplete="current-password"
@@ -111,7 +111,7 @@ export function StepUpProvider({ children, elevatedUntil = 0 }: { children: Reac
             />
           </label>
           <label className="field">
-            Код из приложения-аутентификатора
+            Authenticator code
             <input
               className="input otp-input mono"
               inputMode="numeric"
@@ -125,15 +125,15 @@ export function StepUpProvider({ children, elevatedUntil = 0 }: { children: Reac
           {error && <p className="error">{error}</p>}
           <div className="row" style={{ justifyContent: "flex-end" }}>
             <button className="btn" onClick={() => close(false)}>
-              Отмена
+              Cancel
             </button>
             {hello && (
-              <button className="btn" disabled={busy || !password} onClick={submitHello} title="Мастер-пароль и Windows Hello вместо кода">
+              <button className="btn" disabled={busy || !password} onClick={submitHello} title="Master password and Windows Hello instead of a code">
                 Windows Hello
               </button>
             )}
             <button className="btn primary" disabled={busy || !password || code.length < 6} onClick={submit}>
-              Повысить права
+              Confirm
             </button>
           </div>
         </Modal>

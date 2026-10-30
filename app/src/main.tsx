@@ -61,14 +61,14 @@ function App() {
     return (
       <div className="center-screen">
         <div className="auth-card">
-          <h1 style={{ fontSize: 21 }}>MCP Keyholder не может связаться со службой</h1>
+          <h1 style={{ fontSize: 21 }}>MCP Keyholder can't reach the service</h1>
           <p className="muted">{status.error}</p>
           <p className="muted small">
-            Пока служба не отвечает, портативное хранилище не открывается: иначе рядом появилась бы вторая, пустая копия. Запустите
-            службу (services.msc → MCP Keyholder) и перезапустите приложение.
+            While the service isn't responding, the portable vault won't open: otherwise a second, empty copy would appear next to it. Start
+            the service (services.msc → MCP Keyholder) and restart the app.
           </p>
           <button className="btn primary" onClick={refresh}>
-            Повторить
+            Retry
           </button>
         </div>
       </div>
@@ -80,18 +80,18 @@ function App() {
 
   const leaked = keys.filter((k) => k.leak).length;
   const nav: { id: Page; label: string; icon: ReactNode; count?: number; badge?: number }[] = [
-    { id: "keys", label: "Ключи", icon: Icon.key(), count: keys.length, badge: leaked || undefined },
-    { id: "grants", label: "Разрешения", icon: Icon.shield(), badge: grants.pending.length || undefined, count: grants.active.length || undefined },
-    { id: "clients", label: "Клиенты", icon: Icon.monitor(), count: clients.filter((c) => !c.revoked).length },
-    { id: "log", label: "Журнал", icon: Icon.list() },
-    { id: "import", label: "Импорт", icon: Icon.download() },
-    { id: "settings", label: "Настройки", icon: Icon.gear() },
+    { id: "keys", label: "Keys", icon: Icon.key(), count: keys.length, badge: leaked || undefined },
+    { id: "grants", label: "Grants", icon: Icon.shield(), badge: grants.pending.length || undefined, count: grants.active.length || undefined },
+    { id: "clients", label: "Clients", icon: Icon.monitor(), count: clients.filter((c) => !c.revoked).length },
+    { id: "log", label: "Log", icon: Icon.list() },
+    { id: "import", label: "Import", icon: Icon.download() },
+    { id: "settings", label: "Settings", icon: Icon.gear() },
   ];
 
   return (
     <StepUpProvider elevatedUntil={status.elevatedUntil}>
       <div className="shell">
-        <nav className="side" aria-label="Разделы">
+        <nav className="side" aria-label="Sections">
           <div className="brand">
             <img className="logo-img" src={logoUrl} alt="" />
             MCP Keyholder
@@ -108,13 +108,13 @@ function App() {
           <div className="side-card">
             <div className="row small" style={{ fontWeight: 600, gap: 8 }}>
               <span className="dot" aria-hidden="true" />
-              Хранилище открыто
+              Vault unlocked
             </div>
             <span className="small muted">
-              Режим: {status.runtime === "service" ? "служба" : "портативный"} · агентов на связи: {grants.sessions.length}
+              {status.runtime === "service" ? "Service" : "Portable"} mode · {grants.sessions.length} {grants.sessions.length === 1 ? "agent" : "agents"} online
             </span>
             <button className="btn sm" onClick={() => api.lock().then(refresh)}>
-              {Icon.lock(15)} Заблокировать
+              {Icon.lock(15)} Lock
             </button>
           </div>
         </nav>

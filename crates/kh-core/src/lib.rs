@@ -20,29 +20,29 @@ pub use vault::Vault;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("хранилище заблокировано")]
+    #[error("vault is locked")]
     Locked,
-    #[error("хранилище ещё не создано")]
+    #[error("vault is not set up yet")]
     NotInitialized,
-    #[error("хранилище уже создано")]
+    #[error("vault is already set up")]
     AlreadyInitialized,
-    #[error("неверный мастер-пароль")]
+    #[error("wrong master password")]
     BadPassword,
-    #[error("неверный код")]
+    #[error("wrong code")]
     BadCode,
-    #[error("ввод кодов временно закрыт: слишком много ошибок")]
+    #[error("code entry is paused: too many wrong codes")]
     CodeLockout,
-    #[error("целостность нарушена: {0}")]
+    #[error("integrity check failed: {0}")]
     Integrity(String),
-    #[error("не найдено: {0}")]
+    #[error("not found: {0}")]
     NotFound(String),
     #[error("{0}")]
     Invalid(String),
-    #[error("ошибка базы: {0}")]
+    #[error("database error: {0}")]
     Db(#[from] rusqlite::Error),
-    #[error("ошибка шифрования")]
+    #[error("encryption error")]
     Crypto,
-    #[error("ошибка ввода-вывода: {0}")]
+    #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 }
 

@@ -32,13 +32,13 @@ export const Icon = {
 };
 
 export function TierPill({ tier, off }: { tier: Tier; off?: boolean }) {
-  if (off) return <span className="pill off">Отключён</span>;
+  if (off) return <span className="pill off">Disabled</span>;
   return <span className={`pill ${tier}`}>{TIER_LABEL[tier]}</span>;
 }
 
 export function ModeText({ mode, sealed }: { mode: Mode; sealed?: boolean }) {
   if (sealed) {
-    return <span className="small muted">только UI</span>;
+    return <span className="small muted">UI only</span>;
   }
   return (
     <span className="mono small" title={MODE_INFO[mode]?.title} style={{ color: "var(--ink-2)" }}>
@@ -59,10 +59,10 @@ ${e.stack ?? ""}` : String(e) };
       return (
         <div className="center-screen">
           <div className="auth-card">
-            <h1 style={{ fontSize: 19 }}>Что-то пошло не так в интерфейсе</h1>
+            <h1 style={{ fontSize: 19 }}>Something went wrong in the interface</h1>
             <pre className="raw mono" style={{ lineHeight: 1.5 }}>{this.state.error}</pre>
             <button className="btn primary" onClick={() => location.reload()}>
-              Перезагрузить окно
+              Reload window
             </button>
           </div>
         </div>
@@ -104,7 +104,7 @@ export function Modal({
       <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2 style={{ fontSize: 19 }}>{title}</h2>
-          <button className="btn icon ghost" aria-label="Закрыть" onClick={onClose}>
+          <button className="btn icon ghost" aria-label="Close" onClick={onClose}>
             {Icon.close(16)}
           </button>
         </div>
@@ -141,7 +141,7 @@ export function Segmented<T extends string>({
 /** A button whose action asks for the master password and code (step-up) when needed. */
 export function LockedButton({ className, children, title, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button {...props} className={`btn ${className ?? ""}`} title={title ?? "Спросит мастер-пароль и код из аутентификатора"}>
+    <button {...props} className={`btn ${className ?? ""}`} title={title ?? "Asks for your master password and authenticator code"}>
       {Icon.lock(14)}
       {children}
     </button>
@@ -172,9 +172,9 @@ export function PasswordInput({ className, ...props }: Omit<InputHTMLAttributes<
       <button
         type="button"
         className="pw-eye"
-        aria-label={show ? "Скрыть пароль" : "Показать пароль"}
+        aria-label={show ? "Hide password" : "Show password"}
         aria-pressed={show}
-        title={show ? "Скрыть пароль" : "Показать пароль"}
+        title={show ? "Hide password" : "Show password"}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setShow((v) => !v)}
       >

@@ -84,7 +84,7 @@ function Approve() {
   if (!req) {
     return (
       <div className="approve">
-        <p className="muted">Запросов нет.</p>
+        <p className="muted">No requests.</p>
       </div>
     );
   }
@@ -112,7 +112,7 @@ function Approve() {
           const m = errText(e);
           if (m === DESKTOP_OFF) {
             setManualCode(true);
-            setError("Отдельный рабочий стол недоступен — введите код в этом окне.");
+            setError("The separate desktop isn't available — enter the code in this window.");
             return;
           }
           throw e;
@@ -157,29 +157,29 @@ function Approve() {
     <div className="approve" onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <span className={`pill ${needOtp ? "otp" : usePin ? "pin" : "soft"}`}>
-          {needCode ? Icon.lock(13) : Icon.shield(13)} {needOtp ? "Нужен код OTP" : usePin ? "Нужен PIN" : "Подтверждение"}
+          {needCode ? Icon.lock(13) : Icon.shield(13)} {needOtp ? "OTP code required" : usePin ? "PIN required" : "Approval"}
         </span>
-        <span className="row small muted" style={{ gap: 6 }} title="Ваше анти-фишинговое слово. Если его нет — это не MCP Keyholder.">
-          слово: <AntiPhish word={word} />
+        <span className="row small muted" style={{ gap: 6 }} title="Your anti-phishing word. If it's missing, this is not MCP Keyholder.">
+          word: <AntiPhish word={word} />
         </span>
       </div>
 
       <h1 style={{ fontSize: 19 }}>
-        {req.client} просит {req.keys.length} {req.keys.length === 1 ? "ключ" : req.keys.length < 5 ? "ключа" : "ключей"}
+        {req.client} asks for {req.keys.length} {req.keys.length === 1 ? "key" : "keys"}
       </h1>
 
       <dl className="fact" style={{ margin: 0 }}>
-        <dt>Клиент</dt>
+        <dt>Client</dt>
         <dd>
-          {req.client} <span className="muted small">(по токену)</span>
+          {req.client} <span className="muted small">(by token)</span>
         </dd>
-        <dt>Процесс</dt>
-        <dd className="mono small">{req.process || "неизвестен"}</dd>
+        <dt>Process</dt>
+        <dd className="mono small">{req.process || "unknown"}</dd>
         {req.claimedClient && (
           <>
-            <dt>Называет себя</dt>
+            <dt>Claims to be</dt>
             <dd className="small">
-              {req.claimedClient} <span className="muted">· со слов агента</span>
+              {req.claimedClient} <span className="muted">· according to the agent</span>
             </dd>
           </>
         )}
@@ -187,14 +187,14 @@ function Approve() {
 
       <div style={{ background: "var(--surface-2)", borderRadius: 12, padding: "10px 14px" }}>
         <div className="small muted" style={{ fontWeight: 600 }}>
-          Причина · со слов агента
+          Reason · according to the agent
         </div>
         <div style={{ overflowWrap: "anywhere" }}>{req.reason}</div>
       </div>
 
       <fieldset className="col" style={{ border: 0, margin: 0, padding: 0, gap: 8 }}>
         <legend className="small muted" style={{ fontWeight: 600, padding: 0, marginBottom: 8 }}>
-          Ключи
+          Keys
         </legend>
         {req.keys.map((k) => (
           <label key={k.id} className="keyrow">
@@ -221,7 +221,7 @@ function Approve() {
           <input
             className="input"
             style={{ maxWidth: 220 }}
-            placeholder="Имя пресета"
+            placeholder="Preset name"
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
           />
@@ -238,9 +238,9 @@ function Approve() {
               }
             }}
           >
-            Сохранить как пресет
+            Save as preset
           </button>
-          <span className="small muted">агент сможет запросить его одним словом</span>
+          <span className="small muted">the agent can request it by this name</span>
         </div>
         {req.removed.map((r) => (
           <div key={r.name} className="keyrow removed">
@@ -253,21 +253,21 @@ function Approve() {
       </fieldset>
 
       <label className="row small" style={{ color: "var(--ink-2)" }}>
-        Срок
+        Duration
         <select className="select" style={{ width: "auto" }} value={ttl} onChange={(e) => setTtl(Number(e.target.value))}>
           {ttlOptions.map((m) => (
             <option key={m} value={m}>
-              {m < 60 ? `${m} минут` : `${m / 60} ч`}
+              {m < 60 ? `${m} min` : `${m / 60} h`}
             </option>
           ))}
         </select>
-        <span className="muted">· уровень: {TIER_LABEL[level]}</span>
+        <span className="muted">· level: {TIER_LABEL[level]}</span>
       </label>
 
       {needCode && manualCode && (
         <div className="otp-box">
           <label className="field" style={{ color: "var(--ink)" }}>
-            {usePin ? "PIN-код" : "Код из приложения-аутентификатора"}
+            {usePin ? "PIN" : "Authenticator code"}
             <input
               className="input otp-input mono"
               type={usePin ? "password" : "text"}
@@ -279,8 +279,8 @@ function Approve() {
             />
           </label>
           <div className="row small" style={{ justifyContent: "space-between", color: "var(--warn-ink)" }}>
-            <span>{usePin ? "Не вводите PIN, если не ждали этого окна." : "Один код — одно подтверждение. Не вводите код, если не ждали этого окна."}</span>
-            <span style={{ flex: "none" }}>Попыток: {3 - req.otpFailures}</span>
+            <span>{usePin ? "Don't enter your PIN if you weren't expecting this window." : "One code, one approval. Don't enter a code if you weren't expecting this window."}</span>
+            <span style={{ flex: "none" }}>Attempts left: {3 - req.otpFailures}</span>
           </div>
         </div>
       )}
@@ -290,22 +290,22 @@ function Approve() {
       <div className="col" style={{ marginTop: "auto", gap: 10 }}>
         <div className="row">
           <button className="btn grow" disabled={busy} onClick={() => decide(false)}>
-            Отклонить
+            Deny
           </button>
           <button className="btn primary grow" disabled={busy || !ready || kept.length === 0 || (needCode && manualCode && code.length < (usePin ? 4 : 6))} onClick={() => decide(true)}>
-            {ready ? "Разрешить" : `Разрешить (${Math.ceil((DELAY_MS - shownFor) / 1000)})`}
+            {ready ? "Allow" : `Allow (${Math.ceil((DELAY_MS - shownFor) / 1000)})`}
           </button>
         </div>
         {needCode && hello && (
           <button className="btn" disabled={busy || !ready || kept.length === 0} onClick={decideHello}>
-            Подтвердить Windows Hello
+            Confirm with Windows Hello
           </button>
         )}
         <div className="row" style={{ justifyContent: "space-between" }}>
           <button className="link" disabled={busy} onClick={() => decide(false, true)}>
-            Отклонить и заблокировать сессию на 10 мин
+            Deny and block the session for 10 min
           </button>
-          {queue > 1 && <span className="small muted">ещё {queue - 1} в очереди</span>}
+          {queue > 1 && <span className="small muted">{queue - 1} more in queue</span>}
         </div>
       </div>
     </div>

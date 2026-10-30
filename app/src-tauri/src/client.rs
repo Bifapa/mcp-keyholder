@@ -27,14 +27,14 @@ pub struct ServiceClient {
 
 impl ServiceClient {
     pub async fn connect(app: AppHandle) -> Result<Arc<ServiceClient>, String> {
-        let sid = kh_core::ipc::current_user_sid().map_err(|e| format!("не удалось определить пользователя: {e}"))?;
+        let sid = kh_core::ipc::current_user_sid().map_err(|e| format!("could not determine the user: {e}"))?;
         let name = kh_core::ipc::ui_pipe_name(&sid);
         let stream = tokio::time::timeout(Duration::from_secs(3), kh_core::ipc::connect_named(&name))
             .await
-            .map_err(|_| "служба MCP Keyholder не отвечает".to_string())?
+            .map_err(|_| "the MCP Keyholder service is not responding".to_string())?
             .map_err(|e| match e.kind() {
-                std::io::ErrorKind::NotFound => "служба MCP Keyholder не запущена".to_string(),
-                _ => format!("не удалось подключиться к службе MCP Keyholder: {e}"),
+                std::io::ErrorKind::NotFound => "the MCP Keyholder service is not running".to_string(),
+                _ => format!("could not connect to the MCP Keyholder service: {e}"),
             })?;
 
         let (rd, mut wr) = tokio::io::split(stream);
@@ -76,7 +76,7 @@ impl ServiceClient {
                 match msg {
                     ServerMsg::Response { id, ok, result, error } => {
                         if let Some(tx) = pending.lock().unwrap_or_else(|e| e.into_inner()).remove(&id) {
-                            let _ = tx.send(if ok { Ok(result) } else { Err(error.unwrap_or_else(|| "ошибка".into())) });
+                            let _ = tx.send(if ok { Ok(result) } else { Err(error.unwrap_or_else(|| "error".into())) });
                         }
                     }
                     ServerMsg::Event { what } => {
@@ -97,7 +97,7 @@ impl ServiceClient {
             // Fail everything still waiting.
             let mut p = pending.lock().unwrap_or_else(|e| e.into_inner());
             for (_, tx) in p.drain() {
-                let _ = tx.send(Err("соединение со службой MCP Keyholder потеряно".into()));
+                let _ = tx.send(Err("lost the connection to the MCP Keyholder service".into()));
             }
         });
 
@@ -110,7 +110,7 @@ impl ServiceClient {
 
     pub async fn call(&self, method: &str, params: Value) -> Result<Value, String> {
         if !self.is_alive() {
-            return Err("служба MCP Keyholder не отвечает — проверьте, запущена ли она".into());
+            return Err("the MCP Keyholder service is not responding — check that it is running".into());
         }
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
@@ -118,14 +118,14 @@ impl ServiceClient {
         let line = serde_json::to_string(&ClientMsg::Request { id, method: method.to_string(), params })
             .map_err(|e| e.to_string())?;
         if self.tx.send(format!("{line}\n")).is_err() {
-            return Err("соединение со службой MCP Keyholder потеряно".into());
+            return Err("lost the connection to the MCP Keyholder service".into());
         }
         match tokio::time::timeout(CALL_TIMEOUT, rx).await {
             Ok(Ok(r)) => r,
-            Ok(Err(_)) => Err("соединение со службой MCP Keyholder потеряно".into()),
+            Ok(Err(_)) => Err("lost the connection to the MCP Keyholder service".into()),
             Err(_) => {
                 self.pending.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
-                Err("служба MCP Keyholder не ответила".into())
+                Err("the MCP Keyholder service did not reply".into())
             }
         }
     }

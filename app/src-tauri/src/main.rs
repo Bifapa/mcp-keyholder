@@ -95,17 +95,19 @@ fn main() {
 fn desktop_test() {
     desktop::GIVE_UP_OVERRIDE_MS.store(8_000, std::sync::atomic::Ordering::Relaxed);
     if std::env::args().any(|a| a == "--no-switch") {
+        // The screen stays usable, so the window may stay longer for a look.
         desktop::TEST_NO_SWITCH.store(true, std::sync::atomic::Ordering::Relaxed);
+        desktop::GIVE_UP_OVERRIDE_MS.store(20_000, std::sync::atomic::Ordering::Relaxed);
     }
     if std::env::args().any(|a| a == "--hang") {
         desktop::TEST_HANG.store(true, std::sync::atomic::Ordering::Relaxed);
     }
     let started = std::time::Instant::now();
     let r = desktop::prompt(desktop::Prompt {
-        heading: "Проверка окна подтверждения".into(),
-        facts: vec![("Что это".into(), "тест: окно закроется само через 8 секунд".into())],
+        heading: "Confirmation window test".into(),
+        facts: vec![("What is this".into(), "test: the window closes by itself in a few seconds".into())],
         agent_note: None,
-        antiphish: "тест".into(),
+        antiphish: "test".into(),
         field: desktop::Field::Password,
     });
     let report = format!(
@@ -113,7 +115,7 @@ fn desktop_test() {
         desktop::available(),
         started.elapsed().as_millis(),
         match r {
-            Ok(_) => "ok (введено значение)".to_string(),
+            Ok(_) => "ok (a value was entered)".to_string(),
             Err(e) => format!("err: {e}"),
         }
     );
@@ -160,10 +162,10 @@ fn build(app: &mut tauri::App, background: bool) -> Result<(), Box<dyn std::erro
 
     app.manage(AppState { core, data_dir, service_installed });
 
-    let open = MenuItem::with_id(app, "open", "Открыть MCP Keyholder", true, None::<&str>)?;
-    let lock = MenuItem::with_id(app, "lock", "Заблокировать", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open MCP Keyholder", true, None::<&str>)?;
+    let lock = MenuItem::with_id(app, "lock", "Lock", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, "quit", "Выйти", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &lock, &sep, &quit])?;
     let mut tray = TrayIconBuilder::with_id("main")
         .tooltip("MCP Keyholder")
@@ -174,7 +176,7 @@ fn build(app: &mut tauri::App, background: bool) -> Result<(), Box<dyn std::erro
             "lock" => {
                 let st = app.state::<AppState>();
                 if let Some(d) = st.local().cloned() {
-                    d.lock_vault("хранилище заблокировано");
+                    d.lock_vault("the vault was locked");
                 } else if let Some(c) = st.service_client() {
                     tauri::async_runtime::spawn(async move {
                         let _ = c.call("lock", json!({})).await;

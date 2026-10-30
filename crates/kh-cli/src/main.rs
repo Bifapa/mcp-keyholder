@@ -13,16 +13,16 @@ use std::process::ExitCode;
 fn usage() -> ExitCode {
     eprintln!(
         "kh {} — KeyHolder CLI\n\n\
-         kh mcp                          MCP-сервер для агента (токен клиента в KH_TOKEN)\n\
-         kh run --ticket T -- <команда>  запустить команду с ключами из билета prepare_run\n\
-         kh scan <путь>...               найти значения ключей в файлах (токен в KH_TOKEN)\n\
-         kh status                       состояние MCP Keyholder",
+         kh mcp                          MCP server for the agent (client token in KH_TOKEN)\n\
+         kh run --ticket T -- <command>  run a command with the keys from a prepare_run ticket\n\
+         kh scan <path>...               find key values in files (token in KH_TOKEN)\n\
+         kh status                       MCP Keyholder status",
         env!("CARGO_PKG_VERSION")
     );
     ExitCode::from(2)
 }
 
-/// Windows consoles interpret bytes with the OEM code page; UTF-8 keeps the Russian text readable.
+/// Windows consoles interpret bytes with the OEM code page; UTF-8 keeps non-ASCII text (key names, paths) readable.
 #[cfg(windows)]
 fn utf8_console() {
     use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
@@ -85,7 +85,7 @@ async fn run_cmd(args: &[String]) -> ExitCode {
     }
     let cmd = &args[i..];
     let (Some(ticket), Some(program)) = (ticket, cmd.first()) else {
-        eprintln!("использование: kh run --ticket <билет> -- <команда> [аргументы]");
+        eprintln!("usage: kh run --ticket <ticket> -- <command> [args]");
         return ExitCode::from(2);
     };
     let conn = match conn::Conn::connect("run", None, true).await {
@@ -124,7 +124,7 @@ async fn run_cmd(args: &[String]) -> ExitCode {
     match status {
         Ok(s) => ExitCode::from(s.code().unwrap_or(1).clamp(0, 255) as u8),
         Err(e) => {
-            eprintln!("kh: не удалось запустить «{program}»: {e}");
+            eprintln!("kh: could not start \"{program}\": {e}");
             ExitCode::FAILURE
         }
     }
@@ -144,7 +144,7 @@ fn collect_files(path: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
 
 async fn scan(paths: &[String]) -> ExitCode {
     if paths.is_empty() {
-        eprintln!("использование: kh scan <файл или папка>...");
+        eprintln!("usage: kh scan <file or folder>...");
         return ExitCode::from(2);
     }
     let token = std::env::var("KH_TOKEN").ok();
@@ -204,10 +204,10 @@ async fn scan(paths: &[String]) -> ExitCode {
         }
     }
     if total == 0 {
-        println!("Значений ключей не найдено.");
+        println!("No key values found.");
         ExitCode::SUCCESS
     } else {
-        println!("Найденные ключи помечены как слитые в MCP Keyholder.");
+        println!("The keys found are now marked as leaked in MCP Keyholder.");
         ExitCode::from(1)
     }
 }

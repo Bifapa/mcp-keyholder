@@ -19,7 +19,7 @@ const TRANSFER_CHUNK: usize = 1024 * 1024;
 const TRANSFER_MAX: usize = 512 * 1024 * 1024;
 
 fn req<T: for<'de> Deserialize<'de>>(params: Value) -> Result<T, String> {
-    serde_json::from_value(params).map_err(|e| format!("неверные параметры: {e}"))
+    serde_json::from_value(params).map_err(|e| format!("invalid parameters: {e}"))
 }
 
 impl Daemon {
@@ -48,7 +48,7 @@ impl Daemon {
             "unlock_full" => self.unlock_full(params),
             "reset_vault" => self.reset_vault(params),
             "lock" => {
-                self.lock_vault("хранилище заблокировано");
+                self.lock_vault("the vault was locked");
                 Ok(Value::Null)
             }
             "lock_ui" => {
@@ -126,7 +126,7 @@ impl Daemon {
             // ---------- approval window ----------
             "approval_current" => self.approval_current(),
             "approval_decide" => self.approval_decide(params),
-            _ => Err(format!("неизвестный метод интерфейса {method}")),
+            _ => Err(format!("unknown interface method {method}")),
         }
     }
 
@@ -140,7 +140,7 @@ impl Daemon {
         }
         let p: P = req(params)?;
         if self.vault().is_initialized() {
-            return Err("хранилище уже создано".into());
+            return Err("vault is already set up".into());
         }
         let pending = PendingSetup::new(&p.password, &p.word).map_err(err_str)?;
         let out = json!({
@@ -154,7 +154,7 @@ impl Daemon {
 
     fn setup_secret_text(&self) -> CallResult {
         let g = self.pending_setup.lock().unwrap_or_else(|e| e.into_inner());
-        g.as_ref().map(|p| json!(p.seed_base32())).ok_or_else(|| "настройка не начата".into())
+        g.as_ref().map(|p| json!(p.seed_base32())).ok_or_else(|| "setup has not been started".into())
     }
 
     fn setup_finish(&self, params: Value) -> CallResult {
@@ -165,7 +165,7 @@ impl Daemon {
         let p: P = req(params)?;
         let r = {
             let mut slot = self.pending_setup.lock().unwrap_or_else(|e| e.into_inner());
-            let pending = slot.as_ref().ok_or("настройка не начата")?;
+            let pending = slot.as_ref().ok_or("setup has not been started")?;
             let r = self.vault().finish_setup(pending, &p.code);
             if r.is_ok() {
                 *slot = None;
@@ -197,11 +197,11 @@ impl Daemon {
             confirm: String,
         }
         let p: P = req(params)?;
-        if p.confirm.trim() != "СБРОСИТЬ" {
-            return Err("введите СБРОСИТЬ, чтобы подтвердить".into());
+        if p.confirm.trim() != "RESET" {
+            return Err("type RESET to confirm".into());
         }
         self.elevated_until.store(0, Ordering::Relaxed);
-        self.broker.clear_all("хранилище сброшено");
+        self.broker.clear_all("the vault was reset");
         self.close_approval();
         *self.pending_setup.lock().unwrap_or_else(|e| e.into_inner()) = None;
         let backup = self.vault().reset().map_err(err_str)?;
@@ -240,7 +240,7 @@ impl Daemon {
         let p: P = req(params)?;
         let mode = self.vault().settings().map(|s| s.login_mode).unwrap_or_default();
         if self.runtime != Runtime::Service {
-            return Err("вход по PIN и OTP есть только в режиме службы".into());
+            return Err("PIN and OTP sign-in are only available in service mode".into());
         }
         let cred = p.credential.unwrap_or_default();
         let r = {
@@ -273,33 +273,33 @@ impl Daemon {
             hello: bool,
         }
         let p: P = req(params)?;
-        let password = p.password.filter(|x| !x.is_empty()).ok_or("нужен мастер-пароль")?;
+        let password = p.password.filter(|x| !x.is_empty()).ok_or("master password required")?;
         {
             let mut v = self.vault();
             if let Err(e) = v.verify_password(&password) {
-                let _ = v.log(LogInput::new("stepup", "vault", "denied").detail("неверный пароль"));
+                let _ = v.log(LogInput::new("stepup", "vault", "denied").detail("wrong master password"));
                 return Err(e.to_string());
             }
         }
         if p.hello {
-            if let Err(e) = self.verify_presence("MCP Keyholder: повышение прав на 3 минуты") {
-                let _ = self.vault().log(LogInput::new("stepup", "vault", "denied").detail("Windows Hello не подтверждён"));
+            if let Err(e) = self.verify_presence("MCP Keyholder: step-up for 3 minutes") {
+                let _ = self.vault().log(LogInput::new("stepup", "vault", "denied").detail("Windows Hello not confirmed"));
                 return Err(e);
             }
         } else {
             let code = p.code.unwrap_or_default();
             let mut v = self.vault();
             if let Err(e) = v.check_otp(&code) {
-                let _ = v.log(LogInput::new("stepup", "vault", "denied").detail("неверный код"));
+                let _ = v.log(LogInput::new("stepup", "vault", "denied").detail("wrong code"));
                 return Err(e.to_string());
             }
         }
         let until = now_ms() + STEPUP_MS;
         self.elevated_until.store(until, Ordering::Relaxed);
         let _ = self.vault().log(LogInput::new("stepup", "vault", "ok").detail(if p.hello {
-            "повышение прав на 3 минуты (Windows Hello)"
+            "step-up for 3 minutes (Windows Hello)"
         } else {
-            "повышение прав на 3 минуты"
+            "step-up for 3 minutes"
         }));
         Ok(json!(until))
     }
@@ -347,7 +347,7 @@ impl Daemon {
         let elevated = self.is_elevated();
         let mut v = self.vault();
         if p.ids.len() > 1 && p.patch.name.is_some() {
-            return Err("имя нельзя менять сразу у нескольких ключей".into());
+            return Err("cannot rename several keys at once".into());
         }
         // All-or-nothing check for weakening before touching anything.
         if !elevated {
@@ -416,7 +416,7 @@ impl Daemon {
         let mut v = self.vault();
         let name = v.policy_of(&p.id).map_err(err_str)?.name;
         let value = v.read_value(&p.id).map_err(err_str)?;
-        let _ = v.log(LogInput::new("reveal_ui", &name, "ok").detail("значение показано в окне MCP Keyholder"));
+        let _ = v.log(LogInput::new("reveal_ui", &name, "ok").detail("value shown in the MCP Keyholder window"));
         Ok(json!(value.to_string()))
     }
 
@@ -431,7 +431,7 @@ impl Daemon {
         let mut v = self.vault();
         let name = v.policy_of(&p.id).map_err(err_str)?.name;
         let value = v.read_value(&p.id).map_err(err_str)?;
-        let _ = v.log(LogInput::new("copy_ui", &name, "ok").detail("скопировано в буфер на 30 с"));
+        let _ = v.log(LogInput::new("copy_ui", &name, "ok").detail("copied to the clipboard for 30 s"));
         Ok(json!({ "value": value.to_string() }))
     }
 
@@ -465,7 +465,7 @@ impl Daemon {
         let p: P = req(params)?;
         if let Some(g) = self.broker.revoke(&p.id) {
             let names = g.keys.iter().map(|k| k.name.as_str()).collect::<Vec<_>>().join(", ");
-            let _ = self.vault().log(LogInput::new("revoke_grant", &names, "ok").detail(format!("клиент {}", g.client)));
+            let _ = self.vault().log(LogInput::new("revoke_grant", &names, "ok").detail(format!("client {}", g.client)));
         }
         self.emit("grants");
         Ok(Value::Null)
@@ -477,7 +477,7 @@ impl Daemon {
             id: String,
         }
         let p: P = req(params)?;
-        self.deny(&p.id, "отклонено человеком", false);
+        self.deny(&p.id, "denied by the human", false);
         Ok(Value::Null)
     }
 
@@ -566,7 +566,7 @@ impl Daemon {
         }
         let p: P = req(params)?;
         self.require_elevated()?;
-        let c = self.vault().set_client_blocked(&p.id, false, "снято человеком").map_err(err_str)?;
+        let c = self.vault().set_client_blocked(&p.id, false, "unblocked by the human").map_err(err_str)?;
         self.emit("clients");
         Ok(serde_json::to_value(c).unwrap_or_default())
     }
@@ -612,7 +612,7 @@ impl Daemon {
                     Err(e) => errors.push(format!("{name}: {e}")),
                 }
             }
-            let _ = v.log(LogInput::new("import", &format!("{} ключей", added.len()), "ok").detail(added.join(", ")));
+            let _ = v.log(LogInput::new("import", &format!("{} keys", added.len()), "ok").detail(added.join(", ")));
         }
         self.emit("vault");
         Ok(json!({ "added": added, "errors": errors }))
@@ -651,13 +651,13 @@ impl Daemon {
             mode: String,
         }
         let p: P = req(params)?;
-        let mode = LoginMode::parse(&p.mode).ok_or("неизвестный способ входа")?;
+        let mode = LoginMode::parse(&p.mode).ok_or("unknown sign-in method")?;
         self.require_elevated()?;
         if !mode.available_in(self.runtime == Runtime::Service) {
-            return Err("короткий вход возможен только в режиме службы: в портативном режиме ключи заперты мастер-паролем".into());
+            return Err("quick sign-in is only available in service mode: in portable mode the keys are locked by the master password".into());
         }
         if mode == LoginMode::Pin && !self.vault().has_pin() {
-            return Err("сначала задайте PIN".into());
+            return Err("set a PIN first".into());
         }
         let mut s = self.vault().settings().map_err(err_str)?;
         s.login_mode = mode;
@@ -687,7 +687,7 @@ impl Daemon {
         let mut v = self.vault();
         if let Some(pw) = p.password.as_deref().filter(|x| !x.is_empty()) {
             if let Err(e) = v.verify_password(pw) {
-                let _ = v.log(LogInput::new("change_password", "vault", "denied").detail("неверный пароль"));
+                let _ = v.log(LogInput::new("change_password", "vault", "denied").detail("wrong master password"));
                 return Err(e.to_string());
             }
         }
@@ -766,7 +766,7 @@ impl Daemon {
         let p: P = req(params)?;
         let mut v = self.vault();
         if let Err(e) = v.verify_password(&p.password) {
-            let _ = v.log(LogInput::new("recovery", "vault", "denied").detail("неверный пароль"));
+            let _ = v.log(LogInput::new("recovery", "vault", "denied").detail("wrong master password"));
             return Err(e.to_string());
         }
         let uri = v.start_recovery_reissue(&p.code).map_err(err_str)?;
@@ -792,9 +792,9 @@ impl Daemon {
         }
         let p: P = req(params)?;
         let mut t = self.transfer.lock().unwrap_or_else(|e| e.into_inner());
-        let data = t.export.as_ref().ok_or("экспорт не начат")?;
+        let data = t.export.as_ref().ok_or("export has not been started")?;
         if p.offset > data.len() {
-            return Err("неверное смещение".into());
+            return Err("invalid offset".into());
         }
         let end = (p.offset + TRANSFER_CHUNK).min(data.len());
         let chunk = BASE64.encode(&data[p.offset..end]);
@@ -812,17 +812,17 @@ impl Daemon {
             data: String,
         }
         let p: P = req(params)?;
-        let bytes = BASE64.decode(p.data.as_bytes()).map_err(|_| "повреждённый фрагмент файла")?;
+        let bytes = BASE64.decode(p.data.as_bytes()).map_err(|_| "corrupted file chunk")?;
         let mut t = self.transfer.lock().unwrap_or_else(|e| e.into_inner());
         if p.offset == 0 {
             t.import.clear();
         }
         if p.offset != t.import.len() {
-            return Err("фрагменты файла пришли не по порядку".into());
+            return Err("file chunks arrived out of order".into());
         }
         if t.import.len() + bytes.len() > TRANSFER_MAX {
             t.import = Vec::new();
-            return Err("файл слишком большой".into());
+            return Err("file is too large".into());
         }
         t.import.extend_from_slice(&bytes);
         Ok(json!({ "received": t.import.len() }))
@@ -843,18 +843,18 @@ impl Daemon {
         };
         if initialized {
             if !unlocked {
-                return Err("сначала откройте хранилище (или сбросьте его на экране входа)".into());
+                return Err("unlock the vault first (or reset it on the sign-in screen)".into());
             }
             self.require_elevated()?;
         }
         let data = std::mem::take(&mut self.transfer.lock().unwrap_or_else(|e| e.into_inner()).import);
         if data.is_empty() {
-            return Err("файл не загружен".into());
+            return Err("no file uploaded".into());
         }
         // Check the password before dropping grants and sessions of the current vault.
         kh_core::vault::read_export(&data, &p.password).map_err(err_str)?;
         self.elevated_until.store(0, Ordering::Relaxed);
-        self.broker.clear_all("хранилище заменено");
+        self.broker.clear_all("the vault was replaced");
         self.close_approval();
         *self.pending_setup.lock().unwrap_or_else(|e| e.into_inner()) = None;
         let backup = self.vault().import_file(&data, &p.password).map_err(err_str)?;
@@ -892,40 +892,40 @@ impl Daemon {
             hello: bool,
         }
         let p: P = req(params)?;
-        let view = self.broker.current_shown().ok_or("запроса уже нет")?;
+        let view = self.broker.current_shown().ok_or("the request is no longer pending")?;
         if view.id != p.id {
-            return Err("на экране уже другой запрос".into());
+            return Err("a different request is on screen now".into());
         }
         if !p.approve {
             let why = if p.block_session {
-                "отклонено человеком, сессия заблокирована на 10 минут"
+                "denied by the human; session blocked for 10 minutes"
             } else {
-                "отклонено человеком"
+                "denied by the human"
             };
             self.deny(&p.id, why, p.block_session);
             return Ok(json!({ "ok": true }));
         }
         if now_ms() - view.shown_at.unwrap_or(now_ms()) < 1500 {
-            return Err("подождите секунду и проверьте запрос".into());
+            return Err("wait a second and review the request".into());
         }
         let keys: Vec<_> = view.keys.iter().filter(|k| p.keep.contains(&k.name)).cloned().collect();
         if keys.is_empty() {
-            return Err("отметьте хотя бы один ключ или отклоните запрос".into());
+            return Err("select at least one key or deny the request".into());
         }
         let ttl = p.ttl_minutes.clamp(1, view.ttl_minutes.max(1));
         let level = keys.iter().map(|k| k.tier).max().unwrap_or(Tier::Soft);
         if level >= Tier::Pin && p.hello {
             let names = keys.iter().map(|k| k.name.as_str()).collect::<Vec<_>>().join(", ");
-            let message = format!("MCP Keyholder: {} просит {} на {} мин", view.client, names, ttl);
+            let message = format!("MCP Keyholder: {} asks for {} for {} min", view.client, names, ttl);
             self.verify_presence(&message)?;
             // The request may have been answered elsewhere while the dialog was open.
             if self.broker.front_id().as_deref() != Some(p.id.as_str()) {
-                return Err("запроса уже нет".into());
+                return Err("the request is no longer pending".into());
             }
             let _ = self.vault().log(
                 LogInput::new("hello", &view.client, "ok")
                     .by(&view.client, &view.session)
-                    .detail("подтверждение присутствием (Windows Hello)"),
+                    .detail("presence confirmed (Windows Hello)"),
             );
         } else if level >= Tier::Pin {
             let code = p.code.unwrap_or_default();
@@ -943,19 +943,19 @@ impl Daemon {
                 Err(kh_core::Error::BadCode) => {
                     let n = self.broker.note_otp_failure(&p.id);
                     let _ = self.vault().log(
-                        LogInput::new("otp", &view.client, "bad_code").by(&view.client, &view.session).detail(format!("попытка {n} из 3")),
+                        LogInput::new("otp", &view.client, "bad_code").by(&view.client, &view.session).detail(format!("attempt {n} of 3")),
                     );
                     if n >= 3 {
                         if let Some(s) = self.broker.session(&view.session) {
                             if let Some(cid) = s.client_id {
-                                let _ = self.vault().set_client_blocked(&cid, true, "3 неверных кода подряд");
+                                let _ = self.vault().set_client_blocked(&cid, true, "3 wrong codes in a row");
                             }
                         }
-                        self.deny(&p.id, "3 неверных кода — запрос отклонён, клиент заблокирован", false);
-                        return Err("Три неверных кода. Запрос отклонён, клиент заблокирован.".into());
+                        self.deny(&p.id, "3 wrong codes: request denied, client blocked", false);
+                        return Err("three wrong codes: request denied, client blocked".into());
                     }
                     self.emit("approvals");
-                    return Err(format!("Неверный код. Осталось попыток: {}", 3 - n));
+                    return Err(format!("wrong code, attempts left: {}", 3 - n));
                 }
                 Err(e) => return Err(e.to_string()),
             }
@@ -977,7 +977,7 @@ impl Daemon {
         let _ = self.vault().log(
             LogInput::new("grant", &names, "granted")
                 .by(&view.client, &view.session)
-                .detail(format!("{} · {ttl} мин · {}", level.as_str(), view.reason)),
+                .detail(format!("{} · {ttl} min · {}", level.as_str(), view.reason)),
         );
         self.broker.resolve(&p.id, Outcome::Granted(grant));
         self.after_decision();
@@ -1057,7 +1057,7 @@ mod tests {
     fn daemon() -> (tempfile::TempDir, std::sync::Arc<Daemon>) {
         let dir = tempfile::tempdir().unwrap();
         let mut v = Vault::open(&dir.path().join("vault.db")).unwrap();
-        let p = PendingSetup::new("correct horse battery", "сова").unwrap();
+        let p = PendingSetup::new("correct horse battery", "owl").unwrap();
         let seed = BASE32_NOPAD.decode(p.seed_base32().as_bytes()).unwrap();
         let code = totp::code_at_step(&seed, totp::step_at(now_ms() / 1000) - 1);
         v.finish_setup(&p, &code).unwrap();
@@ -1068,7 +1068,7 @@ mod tests {
     #[test]
     fn stepup_needs_the_master_password() {
         let (_d, d) = daemon();
-        assert_eq!(d.call("stepup", json!({ "hello": true })).unwrap_err(), "нужен мастер-пароль");
+        assert_eq!(d.call("stepup", json!({ "hello": true })).unwrap_err(), "master password required");
         assert!(d.call("stepup", json!({ "code": "123456" })).is_err());
         assert!(!d.is_elevated());
     }
@@ -1087,11 +1087,11 @@ mod tests {
     fn changes_after_stepup_need_no_second_code() {
         let (_d, d) = daemon();
         // Without a step-up nothing changes.
-        assert_eq!(d.call("change_antiphish", json!({ "word": "ёжик" })).unwrap_err(), "stepup_required");
+        assert_eq!(d.call("change_antiphish", json!({ "word": "hedgehog" })).unwrap_err(), "stepup_required");
         assert_eq!(d.call("reissue_totp_begin", json!({})).unwrap_err(), "stepup_required");
         d.elevated_until.store(now_ms() + 60_000, Ordering::Relaxed);
-        d.call("change_antiphish", json!({ "word": "ёжик" })).unwrap();
-        assert_eq!(d.vault().antiphish_word().unwrap(), "ёжик");
+        d.call("change_antiphish", json!({ "word": "hedgehog" })).unwrap();
+        assert_eq!(d.vault().antiphish_word().unwrap(), "hedgehog");
         // An extra password, when a caller passes one, is still checked.
         assert!(d.call("change_password", json!({ "password": "wrong password!!", "new_password": "a brand new password" })).is_err());
         d.call("change_password", json!({ "new_password": "a brand new password" })).unwrap();

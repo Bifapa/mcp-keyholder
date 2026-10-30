@@ -307,32 +307,32 @@ export function errText(e: unknown): string {
 }
 
 export const TIER_LABEL: Record<Tier, string> = {
-  auto: "Без окна",
-  soft: "Мягкое",
+  auto: "No window",
+  soft: "Soft",
   pin: "PIN",
   otp: "OTP",
-  sealed: "Запечатан",
+  sealed: "Sealed",
 };
 
 export const TIER_HINT: Record<Tier, string> = {
-  auto: "Выдаётся сразу, только запись в журнал.",
-  soft: "Окно с кнопкой «Разрешить». Защищает от случайностей, не от агента.",
-  pin: "Окно с вашим постоянным PIN-кодом из 4–6 цифр. Проще OTP, но код не меняется.",
-  otp: "Окно с кодом из приложения-аутентификатора. Один код — одно подтверждение.",
-  sealed: "Агентам не выдаётся никогда. Только вам, в этом окне, после подтверждения.",
+  auto: "Given out at once, only written to the log.",
+  soft: "A window with an “Allow” button. Guards against accidents, not against the agent.",
+  pin: "A window asking for your fixed 4–6 digit PIN. Simpler than OTP, but the code never changes.",
+  otp: "A window asking for a code from your authenticator app. One code, one approval.",
+  sealed: "Never given to agents. Only to you, in this window, after you confirm it's you.",
 };
 
 export const MODE_INFO: Record<Mode, { title: string; desc: string; available: boolean }> = {
-  reveal: { title: "Отдать значение", desc: "Агент получает ключ в ответе MCP. Удобно, но значение останется в истории агента.", available: true },
-  env: { title: "Переменная окружения", desc: "kh run кладёт ключ в окружение процесса. Агент не видит значение в чате.", available: true },
-  proxy: { title: "Заглушка + прокси", desc: "Агент видит подделку, настоящий ключ подставляется по пути к разрешённому хосту.", available: false },
-  sign: { title: "Только подпись", desc: "Для приватных ключей: агент получает подписи, ключ не выходит наружу.", available: false },
-  recipe: { title: "Рецепт", desc: "Только заранее заданные команды с этим ключом.", available: false },
+  reveal: { title: "Return the value", desc: "The agent gets the key in the MCP response. Convenient, but the value stays in the agent's history.", available: true },
+  env: { title: "Environment variable", desc: "kh run puts the key into the process environment. The agent never sees the value in the chat.", available: true },
+  proxy: { title: "Placeholder + proxy", desc: "The agent sees a fake; the real key is swapped in on the way to an allowed host.", available: false },
+  sign: { title: "Signing only", desc: "For private keys: the agent gets signatures, the key never leaves.", available: false },
+  recipe: { title: "Recipe", desc: "Only predefined commands that use this key.", available: false },
 };
 
 export const LOGIN_LABEL: Record<LoginMode, string> = {
-  password: "Мастер-пароль",
-  nothing: "Ничего",
+  password: "Master password",
+  nothing: "Nothing",
   pin: "PIN",
   otp: "OTP",
 };
@@ -341,27 +341,27 @@ export function ago(ts: number | null | undefined): string {
   if (!ts) return "—";
   const d = Date.now() - ts;
   const m = Math.round(d / 60000);
-  if (m < 1) return "только что";
-  if (m < 60) return `${m} мин назад`;
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
-  if (h < 24) return `${h} ч назад`;
+  if (h < 24) return `${h} h ago`;
   const days = Math.round(h / 24);
-  if (days === 1) return "вчера";
-  if (days < 7) return `${days} дн. назад`;
-  return new Date(ts).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 export function left(ts: number): string {
   const s = Math.max(0, Math.round((ts - Date.now()) / 1000));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h} ч ${m} мин`;
-  if (m > 0) return `${m} мин ${s % 60} с`;
-  return `${s} с`;
+  if (h > 0) return `${h} h ${m} min`;
+  if (m > 0) return `${m} min ${s % 60} s`;
+  return `${s} s`;
 }
 
 export function timeOf(ts: number): string {
-  return new Date(ts).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return new Date(ts).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 export function defaultEnvName(name: string): string {

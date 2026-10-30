@@ -365,7 +365,7 @@ pub fn valid_key_name(name: &str) -> bool {
 }
 
 /// Names of sealed keys — the human's own records, never listed to agents — may use any
-/// lowercase letters (Cyrillic too), digits, single inner spaces and `. _ / -`, up to 64 chars.
+/// lowercase letters (non-Latin too), digits, single inner spaces and `. _ / -`, up to 64 chars.
 pub fn valid_sealed_name(name: &str) -> bool {
     let n = name.chars().count();
     n > 0

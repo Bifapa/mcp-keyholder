@@ -88,8 +88,8 @@ fn parse(args: Vec<String>) -> Cmd {
 
 fn usage() -> ! {
     eprintln!(
-        "keyholder-service — ядро MCP Keyholder под отдельной учётной записью\n\
-         \n  keyholder-service                         запуск службы (из диспетчера служб)\
+        "keyholder-service: the MCP Keyholder core under a separate account\n\
+         \n  keyholder-service                         run as a service (started by the service control manager)\
          \n  keyholder-service --console [--data-dir DIR] [--owner SID]\
          \n  keyholder-service install [--source vault.db] [--owner SID] [--app keyholder.exe] [--log FILE]\
          \n  keyholder-service uninstall [--restore DIR]\
@@ -98,7 +98,7 @@ fn usage() -> ! {
     std::process::exit(2)
 }
 
-/// Windows consoles interpret bytes with the OEM code page; UTF-8 keeps the Russian text readable.
+/// Windows consoles interpret bytes with the OEM code page; UTF-8 keeps non-ASCII text (paths, names) readable.
 #[cfg(windows)]
 fn utf8_console() {
     use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
@@ -121,7 +121,7 @@ fn main() {
         #[cfg(windows)]
         Cmd::Run => win::dispatch().map_err(|e| anyhow::anyhow!(e)),
         #[cfg(not(windows))]
-        Cmd::Run => Err(anyhow::anyhow!("служба есть только в Windows; используйте --console")),
+        Cmd::Run => Err(anyhow::anyhow!("the service is only available on Windows; use --console")),
         Cmd::Console { data_dir, owner } => {
             let data_dir = data_dir.unwrap_or_else(default_dev_dir);
             let owner = match owner {
@@ -132,7 +132,7 @@ fn main() {
                 .ok()
                 .map(|p| p.with_file_name(if cfg!(windows) { "kh.exe" } else { "kh" }).to_string_lossy().to_string())
                 .unwrap_or_else(|| "kh".into());
-            eprintln!("MCP Keyholder: режим консоли, данные в {}", data_dir.display());
+            eprintln!("MCP Keyholder: console mode, data in {}", data_dir.display());
             let (tx, rx) = tokio::sync::oneshot::channel();
             let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build();
             let r = match rt {
@@ -149,18 +149,18 @@ fn main() {
         #[cfg(windows)]
         Cmd::Install { source, owner, app } => win::install(source, owner, app),
         #[cfg(not(windows))]
-        Cmd::Install { .. } => Err(anyhow::anyhow!("режим службы есть только в Windows")),
+        Cmd::Install { .. } => Err(anyhow::anyhow!("service mode is only available on Windows")),
         #[cfg(windows)]
         Cmd::Uninstall { restore } => win::uninstall(restore),
         #[cfg(not(windows))]
-        Cmd::Uninstall { .. } => Err(anyhow::anyhow!("режим службы есть только в Windows")),
+        Cmd::Uninstall { .. } => Err(anyhow::anyhow!("service mode is only available on Windows")),
         #[cfg(windows)]
         Cmd::Status => win::status(),
         #[cfg(not(windows))]
-        Cmd::Status => Err(anyhow::anyhow!("режим службы есть только в Windows")),
+        Cmd::Status => Err(anyhow::anyhow!("service mode is only available on Windows")),
     };
     if let Err(e) = result {
-        eprintln!("Ошибка: {e:#}");
+        eprintln!("Error: {e:#}");
         // The app starts install/uninstall elevated without a console: leave the reason in a file.
         if let Some(path) = log_path() {
             let _ = std::fs::write(path, format!("{e:#}"));

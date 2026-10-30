@@ -188,7 +188,7 @@ async fn handle(srv: Arc<Server>, msg: Value) {
                         tokio::time::sleep(Duration::from_secs(10)).await;
                         n += 1;
                         srv2.send(json!({ "jsonrpc": "2.0", "method": "notifications/progress", "params": {
-                            "progressToken": tok, "progress": n, "message": "Ждём решения человека в окне MCP Keyholder…"
+                            "progressToken": tok, "progress": n, "message": "Waiting for the human to decide in the MCP Keyholder window…"
                         } }));
                     }
                 })

@@ -51,7 +51,7 @@ impl ServiceSlot {
                 Ok(c)
             }
             Err(e) => {
-                let msg = format!("Режим службы включён, но служба недоступна: {e}");
+                let msg = format!("Service mode is on, but the service is unavailable: {e}");
                 *self.last_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(msg.clone());
                 Err(msg)
             }
@@ -91,7 +91,7 @@ impl AppState {
                 let m = method.to_string();
                 tokio::task::spawn_blocking(move || d.call(&m, params))
                     .await
-                    .map_err(|e| format!("ошибка ядра: {e}"))?
+                    .map_err(|e| format!("core error: {e}"))?
             }
             Core::Service(c) => c.call(method, params).await,
         }
@@ -127,7 +127,7 @@ pub fn show_approval_window(app: &AppHandle) {
         return;
     }
     let built = tauri::WebviewWindowBuilder::new(app, "approve", tauri::WebviewUrl::App("approve.html".into()))
-        .title("MCP Keyholder — запрос доступа")
+        .title("MCP Keyholder — access request")
         .inner_size(480.0, 830.0)
         .resizable(false)
         .maximizable(false)

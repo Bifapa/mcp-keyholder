@@ -30,13 +30,13 @@ pub async fn run(d: Arc<Daemon>) {
             // The service keeps serving agents: only the human's own inactivity closes the
             // interface. Full lock forgets the keys once nobody (human or agent) uses them.
             if settings.full_lock && idle_any >= limit {
-                d.lock_vault("полная блокировка после бездействия");
+                d.lock_vault("full lock after inactivity");
             } else if idle_ui >= limit && d.ui_unlocked() && settings.login_mode != kh_core::LoginMode::Nothing {
                 d.elevated_until.store(0, Ordering::Relaxed);
                 d.set_ui_unlocked(false);
             }
         } else if idle_any >= limit {
-            d.lock_vault("автоблокировка по бездействию");
+            d.lock_vault("auto-lock after inactivity");
         }
     }
 }

@@ -45,7 +45,7 @@ fn service_exe() -> Result<PathBuf, String> {
     if p.exists() {
         Ok(p)
     } else {
-        Err(format!("Рядом с приложением нет {SERVICE_EXE}: переустановите MCP Keyholder скриптом scripts\\install.ps1"))
+        Err(format!("{SERVICE_EXE} is missing next to the app: reinstall MCP Keyholder with scripts\\install.ps1"))
     }
 }
 
@@ -76,7 +76,7 @@ fn run_elevated(exe: &std::path::Path, args: &str) -> Result<u32, String> {
         info.lpParameters = params.as_ptr();
         info.nShow = 0; // SW_HIDE: the installer has nothing to show
         if ShellExecuteExW(&mut info) == 0 || info.hProcess.is_null() {
-            return Err("Установщик не запустился: нужны права администратора и подтверждение UAC.".into());
+            return Err("The installer did not start: it needs administrator rights and UAC confirmation.".into());
         }
         WaitForSingleObject(info.hProcess, INFINITE);
         let mut code = 1u32;
@@ -88,7 +88,7 @@ fn run_elevated(exe: &std::path::Path, args: &str) -> Result<u32, String> {
 
 #[cfg(not(windows))]
 fn run_elevated(_exe: &std::path::Path, _args: &str) -> Result<u32, String> {
-    Err("режим службы есть только в Windows".into())
+    Err("service mode is only available on Windows".into())
 }
 
 fn run_logged(exe: &std::path::Path, mut args: Vec<String>, what: &str) -> Result<(), String> {
@@ -101,9 +101,9 @@ fn run_logged(exe: &std::path::Path, mut args: Vec<String>, what: &str) -> Resul
         let reason = std::fs::read_to_string(&log).unwrap_or_default();
         let _ = std::fs::remove_file(&log);
         return Err(if reason.trim().is_empty() {
-            format!("{what} не удалось (код {code}).")
+            format!("{what} failed (code {code}).")
         } else {
-            format!("{what} не удалось: {}", reason.trim())
+            format!("{what} failed: {}", reason.trim())
         });
     }
     let _ = std::fs::remove_file(&log);
@@ -113,7 +113,7 @@ fn run_logged(exe: &std::path::Path, mut args: Vec<String>, what: &str) -> Resul
 /// Installs the service and moves the vault into `%ProgramData%`. Blocks until done.
 pub fn install_elevated(portable_vault: &std::path::Path) -> Result<(), String> {
     let exe = service_exe()?;
-    let sid = kh_core::ipc::current_user_sid().map_err(|e| format!("не удалось определить SID: {e}"))?;
+    let sid = kh_core::ipc::current_user_sid().map_err(|e| format!("could not determine the user SID: {e}"))?;
     let mut args = vec!["install".to_string(), "--owner".into(), sid];
     if portable_vault.exists() {
         args.push("--source".into());
@@ -123,14 +123,14 @@ pub fn install_elevated(portable_vault: &std::path::Path) -> Result<(), String> 
         args.push("--app".into());
         args.push(quote(&me.to_string_lossy()));
     }
-    run_logged(&exe, args, "Установка службы")
+    run_logged(&exe, args, "Service installation")
 }
 
 /// Removes the service and copies the vault back to the portable location. Blocks until done.
 pub fn uninstall_elevated(portable_dir: &std::path::Path) -> Result<(), String> {
     let exe = service_exe()?;
     let args = vec!["uninstall".to_string(), "--restore".into(), quote(&portable_dir.to_string_lossy())];
-    run_logged(&exe, args, "Удаление службы")
+    run_logged(&exe, args, "Service removal")
 }
 
 /// After the move the old portable file must never be opened again: keep it aside as a backup.

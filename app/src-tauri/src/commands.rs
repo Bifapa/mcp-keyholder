@@ -62,7 +62,7 @@ pub async fn copy_value(app: AppHandle, window: WebviewWindow, id: String) -> Re
     let v = st.call("copy_value", json!({ "id": id })).await?;
     let value = v.get("value").and_then(|x| x.as_str()).unwrap_or_default().to_string();
     if value.is_empty() {
-        return Err("ключ не найден".into());
+        return Err("key not found".into());
     }
     crate::clipboard::copy_secret(&value)
 }
@@ -94,7 +94,7 @@ pub fn import_read(window: WebviewWindow, paths: Vec<String>) -> Res<Vec<ImportF
             let stem = slug(&p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
             let read = std::fs::metadata(p).and_then(|m| {
                 if m.len() > 256 * 1024 {
-                    Err(std::io::Error::new(std::io::ErrorKind::Other, "файл больше 256 КБ"))
+                    Err(std::io::Error::new(std::io::ErrorKind::Other, "file is larger than 256 KB"))
                 } else {
                     std::fs::read(p)
                 }
@@ -247,7 +247,7 @@ pub async fn approval_native(
     let cur = st.call("approval_current", json!({})).await?;
     let req = cur.get("request").cloned().unwrap_or(Value::Null);
     if req.is_null() {
-        return Err("запроса уже нет".into());
+        return Err("the request is no longer pending".into());
     }
     let has_pin = cur.get("hasPin").and_then(|x| x.as_bool()).unwrap_or(false);
     let level: Tier = req
@@ -277,21 +277,21 @@ pub async fn approval_native(
         .unwrap_or_default();
     let mut shown: Vec<String> = names.iter().take(6).cloned().collect();
     if names.len() > shown.len() {
-        shown.push(format!("и ещё {}", names.len() - shown.len()));
+        shown.push(format!("and {} more", names.len() - shown.len()));
     }
     let mut facts = vec![
-        ("Клиент".to_string(), req.get("client").and_then(|x| x.as_str()).unwrap_or("—").to_string()),
-        ("Процесс".to_string(), req.get("process").and_then(|x| x.as_str()).unwrap_or("—").to_string()),
-        ("Срок".to_string(), format!("{ttl_minutes} мин")),
-        ("Ключи".to_string(), shown.join(", ")),
-        ("Время".to_string(), now_text()),
+        ("Client".to_string(), req.get("client").and_then(|x| x.as_str()).unwrap_or("—").to_string()),
+        ("Process".to_string(), req.get("process").and_then(|x| x.as_str()).unwrap_or("—").to_string()),
+        ("Duration".to_string(), format!("{ttl_minutes} min")),
+        ("Keys".to_string(), shown.join(", ")),
+        ("Time".to_string(), now_text()),
     ];
     if let Some(claimed) = req.get("claimedClient").and_then(|x| x.as_str()).filter(|c| !c.is_empty()) {
-        facts.push(("Представился".to_string(), format!("{claimed} (со слов агента)")));
+        facts.push(("Introduced itself as".to_string(), format!("{claimed} (as the agent claims)")));
     }
     let reason = req.get("reason").and_then(|x| x.as_str()).unwrap_or_default().to_string();
     let p = Prompt {
-        heading: "Запрос доступа к ключам".into(),
+        heading: "Access request".into(),
         facts,
         agent_note: Some(reason),
         antiphish: cur.get("antiphish").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
@@ -313,13 +313,13 @@ pub async fn approval_native(
     Ok(())
 }
 
-/// Local wall-clock time for the confirmation window, e.g. "30.10.2026, 14:32".
+/// Local wall-clock time for the confirmation window, e.g. "2026-10-30 14:32".
 #[cfg(windows)]
 fn now_text() -> String {
     use windows_sys::Win32::System::SystemInformation::GetLocalTime;
     let mut t = unsafe { std::mem::zeroed() };
     unsafe { GetLocalTime(&mut t) };
-    format!("{:02}.{:02}.{}, {:02}:{:02}", t.wDay, t.wMonth, t.wYear, t.wHour, t.wMinute)
+    format!("{}-{:02}-{:02} {:02}:{:02}", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute)
 }
 
 #[cfg(not(windows))]
@@ -336,10 +336,10 @@ pub async fn stepup_native(app: AppHandle, window: WebviewWindow) -> Res<i64> {
     }
     let st = app.state::<AppState>();
     let p = Prompt {
-        heading: "Повышение прав на 3 минуты".into(),
+        heading: "Step-up for 3 minutes".into(),
         facts: vec![
-            ("Что даёт".into(), "показ значений, смена политики, клиенты и настройки".to_string()),
-            ("Время".to_string(), now_text()),
+            ("Allows".into(), "showing values, changing policy, clients and settings".to_string()),
+            ("Time".to_string(), now_text()),
         ],
         agent_note: None,
         antiphish: antiphish(&app).await,
@@ -359,8 +359,8 @@ pub async fn unlock_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
     }
     let st = app.state::<AppState>();
     let p = Prompt {
-        heading: "Разблокировка MCP Keyholder".into(),
-        facts: vec![("Время".to_string(), now_text())],
+        heading: "Unlock MCP Keyholder".into(),
+        facts: vec![("Time".to_string(), now_text())],
         agent_note: None,
         antiphish: antiphish(&app).await,
         field: Field::Password,
@@ -386,8 +386,8 @@ pub async fn login_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
         "pin" | "otp" => {
             let field = if mode == "pin" { Field::Pin } else { Field::Otp };
             let p = Prompt {
-                heading: "Вход в MCP Keyholder".into(),
-                facts: vec![("Способ входа".to_string(), if mode == "pin" { "PIN".into() } else { "Код из аутентификатора".into() })],
+                heading: "Sign in to MCP Keyholder".into(),
+                facts: vec![("Sign-in method".to_string(), if mode == "pin" { "PIN".into() } else { "Authenticator code".into() })],
                 agent_note: None,
                 antiphish: antiphish(&app).await,
                 field,
@@ -396,7 +396,7 @@ pub async fn login_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
         }
         _ => {
             let p = Prompt {
-                heading: "Вход в MCP Keyholder".into(),
+                heading: "Sign in to MCP Keyholder".into(),
                 facts: Vec::new(),
                 agent_note: None,
                 antiphish: antiphish(&app).await,
@@ -419,7 +419,7 @@ fn mcpkey_path(path: &str) -> Res<std::path::PathBuf> {
     let p = std::path::PathBuf::from(path);
     let ok = p.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("mcpkey"));
     if !ok {
-        return Err("файл хранилища должен иметь расширение .mcpkey".into());
+        return Err("the vault file must have the .mcpkey extension".into());
     }
     Ok(p)
 }
@@ -440,7 +440,7 @@ pub async fn export_vault_file(app: AppHandle, window: WebviewWindow, path: Stri
             break;
         }
     }
-    std::fs::write(&path, &data).map_err(|e| format!("не удалось записать файл: {e}"))?;
+    std::fs::write(&path, &data).map_err(|e| format!("could not write the file: {e}"))?;
     Ok(data.len() as u64)
 }
 
@@ -453,7 +453,7 @@ async fn import_allowed(st: &AppState) -> Res<()> {
         return Ok(());
     }
     if !flag("unlocked") {
-        return Err("сначала откройте хранилище (или сбросьте его на экране входа)".into());
+        return Err("unlock the vault first (or reset it on the sign-in screen)".into());
     }
     if s.get("elevatedUntil").and_then(|x| x.as_i64()).unwrap_or(0) <= kh_core::now_ms() {
         return Err("stepup_required".into());
@@ -463,9 +463,9 @@ async fn import_allowed(st: &AppState) -> Res<()> {
 
 async fn upload_mcpkey(st: &AppState, path: &str) -> Res<String> {
     let path = mcpkey_path(path)?;
-    let data = std::fs::read(&path).map_err(|e| format!("не удалось прочитать файл: {e}"))?;
+    let data = std::fs::read(&path).map_err(|e| format!("could not read the file: {e}"))?;
     if !data.starts_with(kh_core::vault::EXPORT_MAGIC) {
-        return Err("это не файл хранилища MCP Keyholder (.mcpkey)".into());
+        return Err("this is not an MCP Keyholder vault file (.mcpkey)".into());
     }
     for (i, chunk) in data.chunks(MCPKEY_CHUNK).enumerate() {
         let offset = i * MCPKEY_CHUNK;
@@ -486,8 +486,8 @@ pub async fn import_vault_native(app: AppHandle, window: WebviewWindow, path: St
     import_allowed(&st).await?;
     let name = upload_mcpkey(&st, &path).await?;
     let p = Prompt {
-        heading: "Загрузка хранилища из файла".into(),
-        facts: vec![("Файл".to_string(), name), ("Время".to_string(), now_text())],
+        heading: "Load a vault from a file".into(),
+        facts: vec![("File".to_string(), name), ("Time".to_string(), now_text())],
         agent_note: None,
         antiphish: antiphish(&app).await,
         field: Field::Password,

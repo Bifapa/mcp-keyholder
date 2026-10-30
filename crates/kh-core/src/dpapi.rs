@@ -65,10 +65,10 @@ pub fn unprotect(blob: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
 
 #[cfg(not(windows))]
 pub fn protect(_data: &[u8]) -> Result<Vec<u8>> {
-    Err(crate::Error::Invalid("DPAPI есть только на Windows".into()))
+    Err(crate::Error::Invalid("DPAPI is only available on Windows".into()))
 }
 
 #[cfg(not(windows))]
 pub fn unprotect(_blob: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-    Err(crate::Error::Invalid("DPAPI есть только на Windows".into()))
+    Err(crate::Error::Invalid("DPAPI is only available on Windows".into()))
 }

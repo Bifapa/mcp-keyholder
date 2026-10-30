@@ -147,11 +147,11 @@ pub struct PendingSetup {
 impl PendingSetup {
     pub fn new(password: &str, antiphish_word: &str) -> Result<Self> {
         if password.chars().count() < 10 {
-            return Err(Error::Invalid("мастер-пароль должен быть не короче 10 символов".into()));
+            return Err(Error::Invalid("the master password must be at least 10 characters long".into()));
         }
         let word = antiphish_word.trim();
         if word.chars().count() < 3 || word.chars().count() > 32 {
-            return Err(Error::Invalid("анти-фишинговое слово: от 3 до 32 символов".into()));
+            return Err(Error::Invalid("anti-phishing word: 3 to 32 characters".into()));
         }
         let recovery = (0..10)
             .map(|_| {
@@ -215,7 +215,7 @@ struct ExportHeader {
 
 /// Opens a `.mcpkey` file with its master password and returns the vault database inside.
 pub fn read_export(data: &[u8], password: &str) -> Result<Zeroizing<Vec<u8>>> {
-    let not_ours = || Error::Invalid("это не файл хранилища MCP Keyholder (.mcpkey)".into());
+    let not_ours = || Error::Invalid("this is not an MCP Keyholder vault file (.mcpkey)".into());
     if data.len() < 12 || &data[..8] != EXPORT_MAGIC {
         return Err(not_ours());
     }
@@ -226,7 +226,7 @@ pub fn read_export(data: &[u8], password: &str) -> Result<Zeroizing<Vec<u8>>> {
     let header_raw = &data[12..12 + hlen];
     let h: ExportHeader = serde_json::from_slice(header_raw).map_err(|_| not_ours())?;
     if h.format != 1 {
-        return Err(Error::Invalid("файл создан более новой версией MCP Keyholder".into()));
+        return Err(Error::Invalid("the file was made by a newer version of MCP Keyholder".into()));
     }
     // The parameters come from the file: refuse ones that would exhaust memory or time.
     if h.kdf.m_kib > 4 * 1024 * 1024 || h.kdf.t > 50 || h.kdf.p > 64 {
@@ -241,7 +241,7 @@ pub fn read_export(data: &[u8], password: &str) -> Result<Zeroizing<Vec<u8>>> {
     let body = &data[12 + hlen..];
     let aad = [&EXPORT_MAGIC[..], header_raw].concat();
     crypto::open(&key, &body[..crypto::NONCE_LEN], &body[crypto::NONCE_LEN..], &aad)
-        .map_err(|_| Error::Integrity("файл .mcpkey повреждён".into()))
+        .map_err(|_| Error::Integrity("the .mcpkey file is damaged".into()))
 }
 
 fn remove_db_files(path: &Path) {
@@ -301,7 +301,7 @@ impl Vault {
         *self = Vault::open(&path)?;
         let name = backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         // Chained into the new log once the new vault is set up.
-        self.pending_log.push((now_ms(), LogInput::new("reset", "vault", "ok").detail(format!("прежнее хранилище сохранено как {name}"))));
+        self.pending_log.push((now_ms(), LogInput::new("reset", "vault", "ok").detail(format!("previous vault kept as {name}"))));
         Ok(backup)
     }
 
@@ -324,7 +324,7 @@ impl Vault {
             format: 1,
             vault_id: hex(&self.vault_id),
             kdf: serde_json::from_slice(&self.meta_get("kdf")?.ok_or(Error::NotInitialized)?)
-                .map_err(|_| Error::Integrity("параметры KDF повреждены".into()))?,
+                .map_err(|_| Error::Integrity("KDF parameters are damaged".into()))?,
             salt: hex(&self.meta_get("salt")?.ok_or(Error::NotInitialized)?),
             wrap_guarded: hex(&self.meta_get("wrap_guarded")?.ok_or(Error::NotInitialized)?),
             created_at: now_ms(),
@@ -340,7 +340,7 @@ impl Vault {
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
         let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM secrets", [], |r| r.get(0))?;
-        self.log(LogInput::new("export", "vault", "ok").detail(format!("экспорт в файл .mcpkey, ключей: {count}")))?;
+        self.log(LogInput::new("export", "vault", "ok").detail(format!("exported to a .mcpkey file, keys: {count}")))?;
         Ok(out)
     }
 
@@ -403,9 +403,9 @@ impl Vault {
         *self = Vault::open(&path)?;
         let detail = if had_vault {
             let name = backup.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            format!("хранилище загружено из файла .mcpkey; прежнее сохранено как {name}")
+            format!("vault loaded from a .mcpkey file; previous one kept as {name}")
         } else {
-            "хранилище загружено из файла .mcpkey".to_string()
+            "vault loaded from a .mcpkey file".to_string()
         };
         self.pending_log.push((now_ms(), LogInput::new("import_vault", "vault", "ok").detail(detail)));
         self.unlock(password)?;
@@ -454,7 +454,7 @@ impl Vault {
         let Some(v) = self.meta_get(k)? else { return Ok(None) };
         let mac = self.meta_get(&format!("{k}.mac"))?.unwrap_or_default();
         if !crypto::hmac_verify(&self.keys()?.policy, &[k.as_bytes(), b"|", &v].concat(), &mac) {
-            return Err(Error::Integrity(format!("подпись «{k}» не сходится")));
+            return Err(Error::Integrity(format!("signature of \"{k}\" does not match")));
         }
         Ok(Some(v))
     }
@@ -488,7 +488,7 @@ impl Vault {
         for (ts, entry) in std::mem::take(&mut self.pending_log) {
             self.append_log(ts, entry)?;
         }
-        self.log(LogInput::new("setup", "vault", "ok").detail("хранилище создано"))?;
+        self.log(LogInput::new("setup", "vault", "ok").detail("vault set up"))?;
         Ok(())
     }
 
@@ -548,7 +548,7 @@ impl Vault {
             return Err(Error::NotInitialized);
         }
         let kdf: KdfParams = serde_json::from_slice(&self.meta_get("kdf")?.ok_or(Error::NotInitialized)?)
-            .map_err(|_| Error::Integrity("параметры KDF повреждены".into()))?;
+            .map_err(|_| Error::Integrity("KDF parameters are damaged".into()))?;
         let salt = self.meta_get("salt")?.ok_or(Error::NotInitialized)?;
         let kek = crypto::derive_kek(password, &salt, kdf)?;
         let we = self.meta_get("wrap_everyday")?.ok_or(Error::NotInitialized)?;
@@ -562,10 +562,10 @@ impl Vault {
         let (everyday, guarded) = self.derive_and_unwrap(password)?;
         let blob = self.meta_get("totp")?.ok_or(Error::NotInitialized)?;
         if blob.len() < crypto::NONCE_LEN {
-            return Err(Error::Integrity("секрет TOTP повреждён".into()));
+            return Err(Error::Integrity("TOTP secret is damaged".into()));
         }
         let seed = crypto::open(&guarded, &blob[..crypto::NONCE_LEN], &blob[crypto::NONCE_LEN..], &self.aad("totp"))
-            .map_err(|_| Error::Integrity("секрет TOTP повреждён".into()))?;
+            .map_err(|_| Error::Integrity("TOTP secret is damaged".into()))?;
         self.install_keys(everyday, guarded, seed);
         // Take the newest of the in-memory and stored step; a stored value with a bad MAC is ignored.
         if let Ok(Some(v)) = self.meta_get_signed("totp_last_step") {
@@ -632,7 +632,7 @@ impl Vault {
             let mult = 1i64 << self.otp_lockouts.min(4).saturating_sub(1);
             self.otp_lock_until = now + OTP_FAIL_WINDOW_MS * mult;
             self.otp_failures.clear();
-            let _ = self.log(LogInput::new("otp_lockout", "vault", "locked").detail("слишком много неверных кодов"));
+            let _ = self.log(LogInput::new("otp_lockout", "vault", "locked").detail("too many wrong codes"));
         }
     }
 
@@ -645,14 +645,14 @@ impl Vault {
     /// Sets or replaces the PIN (4–6 digits). Stored as an Argon2id hash under a policy MAC.
     pub fn set_pin(&mut self, pin: &str) -> Result<()> {
         if !(4..=6).contains(&pin.len()) || !pin.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(Error::Invalid("PIN — от 4 до 6 цифр".into()));
+            return Err(Error::Invalid("PIN must be 4 to 6 digits".into()));
         }
         self.keys()?;
         let salt = crypto::random_bytes::<16>();
         let hash = crypto::derive_kek(pin, &salt, PIN_KDF)?;
         let rec = PinRecord { salt: hex(&salt), hash: hex(hash.as_ref()) };
         self.meta_set_signed("pin", &serde_json::to_vec(&rec).expect("serialize"))?;
-        self.log(LogInput::new("set_pin", "vault", "ok").detail("PIN задан"))
+        self.log(LogInput::new("set_pin", "vault", "ok").detail("PIN set"))
     }
 
     /// Verifies the PIN. Shares the failure limit with OTP codes.
@@ -662,10 +662,10 @@ impl Vault {
             return Err(Error::CodeLockout);
         }
         let rec: PinRecord = match self.meta_get_signed("pin")? {
-            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("PIN повреждён".into()))?,
-            None => return Err(Error::Invalid("PIN не задан".into())),
+            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("PIN is damaged".into()))?,
+            None => return Err(Error::Invalid("PIN is not set".into())),
         };
-        let salt = HEXLOWER.decode(rec.salt.as_bytes()).map_err(|_| Error::Integrity("PIN повреждён".into()))?;
+        let salt = HEXLOWER.decode(rec.salt.as_bytes()).map_err(|_| Error::Integrity("PIN is damaged".into()))?;
         let hash = crypto::derive_kek(pin, &salt, PIN_KDF)?;
         if crypto::ct_eq(hex(hash.as_ref()).as_bytes(), rec.hash.as_bytes()) {
             Ok(())
@@ -690,26 +690,26 @@ impl Vault {
 
     pub fn settings(&self) -> Result<Settings> {
         match self.meta_get_signed("settings")? {
-            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("настройки повреждены".into())),
+            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("settings are damaged".into())),
             None => Ok(Settings::default()),
         }
     }
 
     pub fn set_settings(&mut self, s: &Settings) -> Result<()> {
         if s.autolock_minutes == 0 || s.autolock_minutes > 24 * 60 {
-            return Err(Error::Invalid("автоблокировка: от 1 минуты до 24 часов".into()));
+            return Err(Error::Invalid("auto-lock: 1 minute to 24 hours".into()));
         }
         if s.max_ttl_minutes == 0 || s.default_ttl_minutes == 0 || s.default_ttl_minutes > s.max_ttl_minutes {
-            return Err(Error::Invalid("срок по умолчанию должен быть не больше максимального".into()));
+            return Err(Error::Invalid("the default duration must not exceed the maximum".into()));
         }
         if s.login_mode == LoginMode::Pin && !self.has_pin() {
-            return Err(Error::Invalid("сначала задайте PIN".into()));
+            return Err(Error::Invalid("set a PIN first".into()));
         }
         self.meta_set_signed("settings", &serde_json::to_vec(s).expect("serialize"))?;
         // Readable while locked: startup has to know whether to restore the keys.
         self.meta_set("full_lock", if s.full_lock { b"1" } else { b"0" })?;
         self.log(LogInput::new("settings", "vault", "ok").detail(format!(
-            "автоблокировка {} мин, срок {}/{} мин",
+            "auto-lock {} min, duration {}/{} min",
             s.autolock_minutes, s.default_ttl_minutes, s.max_ttl_minutes
         )))
     }
@@ -744,26 +744,26 @@ impl Vault {
         // Agents ask for keys by name, so theirs stay plain Latin; sealed keys never reach an
         // agent and may be named in any language.
         let sealed = p.tier == Tier::Sealed;
-        for (what, v) in [("имя", &p.name), ("группа", &p.group)] {
+        for (what, v) in [("name", &p.name), ("group", &p.group)] {
             if sealed {
                 if !valid_sealed_name(v) {
-                    return Err(Error::Invalid(format!("{what} «{v}»: строчные буквы, цифры, пробел и . _ / - (до 64 символов)")));
+                    return Err(Error::Invalid(format!("{what} \"{v}\": any lowercase letters, digits, space and . _ / - (up to 64 characters)")));
                 }
             } else if !valid_key_name(v) {
                 return Err(Error::Invalid(if valid_sealed_name(v) {
                     format!(
-                        "{what} «{v}»: русские буквы и пробелы можно только у запечатанных ключей — агенты находят ключи по латинскому имени"
+                        "{what} \"{v}\": non-Latin letters and spaces are only allowed for sealed keys — agents find keys by their Latin name"
                     )
                 } else {
-                    format!("{what} «{v}»: только строчные латинские буквы, цифры и . _ / - (до 64 символов)")
+                    format!("{what} \"{v}\": only lowercase Latin letters, digits and . _ / - (up to 64 characters)")
                 }));
             }
         }
         if !valid_env_name(&p.env_name) {
-            return Err(Error::Invalid(format!("имя переменной «{}»: только A-Z, 0-9 и _", p.env_name)));
+            return Err(Error::Invalid(format!("variable name \"{}\": only A-Z, 0-9 and _", p.env_name)));
         }
         if !p.mode.available() {
-            return Err(Error::Invalid(format!("режим «{}» появится в следующей версии", p.mode.as_str())));
+            return Err(Error::Invalid(format!("mode \"{}\" is coming in a later version", p.mode.as_str())));
         }
         Ok(())
     }
@@ -771,10 +771,10 @@ impl Vault {
     pub fn add_secret(&mut self, s: NewSecret) -> Result<SecretMeta> {
         self.keys()?;
         if s.value.is_empty() {
-            return Err(Error::Invalid("пустое значение".into()));
+            return Err(Error::Invalid("the value is empty".into()));
         }
         if s.value.len() > 64 * 1024 {
-            return Err(Error::Invalid("значение длиннее 64 КБ".into()));
+            return Err(Error::Invalid("the value is longer than 64 KB".into()));
         }
         let p = Policy {
             name: s.name.trim().to_string(),
@@ -790,7 +790,7 @@ impl Vault {
         };
         Self::validate_policy(&p)?;
         if self.find_id(&p.name)?.is_some() {
-            return Err(Error::Invalid(format!("ключ «{}» уже есть", p.name)));
+            return Err(Error::Invalid(format!("key \"{}\" already exists", p.name)));
         }
         let id = uuid::Uuid::new_v4().to_string();
         let version = 1;
@@ -894,7 +894,7 @@ impl Vault {
             .optional()?
             .ok_or_else(|| Error::NotFound(id.to_string()))?;
         if !crypto::hmac_verify(&k.policy, p.canonical(id, version).as_bytes(), &mac) {
-            return Err(Error::Integrity(format!("политика ключа «{}» изменена вне MCP Keyholder", p.name)));
+            return Err(Error::Integrity(format!("the policy of key \"{}\" was changed outside MCP Keyholder", p.name)));
         }
         Ok((p, version, nonce, ct))
     }
@@ -903,7 +903,7 @@ impl Vault {
     pub fn read_value(&self, id: &str) -> Result<Zeroizing<String>> {
         let (p, version, nonce, ct) = self.load_policy(id)?;
         let pt = crypto::open(self.partition_key(&p)?, &nonce, &ct, &self.value_aad(id, version, &p))
-            .map_err(|_| Error::Integrity(format!("шифротекст ключа «{}» не проходит проверку", p.name)))?;
+            .map_err(|_| Error::Integrity(format!("the ciphertext of key \"{}\" fails verification", p.name)))?;
         Ok(Zeroizing::new(String::from_utf8_lossy(&pt).to_string()))
     }
 
@@ -945,12 +945,12 @@ impl Vault {
             return Err(Error::Invalid("stepup_required".into()));
         }
         if new.name != old.name && self.find_id(&new.name)?.is_some() {
-            return Err(Error::Invalid(format!("ключ «{}» уже есть", new.name)));
+            return Err(Error::Invalid(format!("key \"{}\" already exists", new.name)));
         }
         let now = now_ms();
         if new != old {
             let pt = crypto::open(self.partition_key(&old)?, &nonce, &ct, &self.value_aad(id, version, &old))
-                .map_err(|_| Error::Integrity(format!("шифротекст ключа «{}» не проходит проверку", old.name)))?;
+                .map_err(|_| Error::Integrity(format!("the ciphertext of key \"{}\" fails verification", old.name)))?;
             let nv = version + 1;
             let (n2, c2) = crypto::seal(self.partition_key(&new)?, &pt, &self.value_aad(id, nv, &new))?;
             let mac = self.policy_mac(id, nv, &new)?;
@@ -961,22 +961,22 @@ impl Vault {
             )?;
             let mut changes = Vec::new();
             if old.tier != new.tier {
-                changes.push(format!("уровень {} → {}", old.tier.as_str(), new.tier.as_str()));
+                changes.push(format!("level {} → {}", old.tier.as_str(), new.tier.as_str()));
             }
             if old.mode != new.mode {
-                changes.push(format!("режим {} → {}", old.mode.as_str(), new.mode.as_str()));
+                changes.push(format!("mode {} → {}", old.mode.as_str(), new.mode.as_str()));
             }
             if old.name != new.name {
-                changes.push(format!("имя {} → {}", old.name, new.name));
+                changes.push(format!("name {} → {}", old.name, new.name));
             }
             if old.status != new.status {
-                changes.push(if new.status == KeyStatus::Active { "включён".into() } else { "отключён".into() });
+                changes.push(if new.status == KeyStatus::Active { "enabled".into() } else { "disabled".into() });
             }
             if old.group != new.group {
-                changes.push(format!("группа {} → {}", old.group, new.group));
+                changes.push(format!("group {} → {}", old.group, new.group));
             }
             if old.env_name != new.env_name {
-                changes.push(format!("переменная {} → {}", old.env_name, new.env_name));
+                changes.push(format!("variable {} → {}", old.env_name, new.env_name));
             }
             self.log(LogInput::new("edit_key", &new.name, "ok").detail(changes.join(", ")))?;
         }
@@ -993,7 +993,7 @@ impl Vault {
     /// Replaces the value (rotation). Clears leak/exposure marks.
     pub fn replace_value(&mut self, id: &str, value: &str) -> Result<SecretMeta> {
         if value.is_empty() || value.len() > 64 * 1024 {
-            return Err(Error::Invalid("значение пустое или длиннее 64 КБ".into()));
+            return Err(Error::Invalid("the value is empty or longer than 64 KB".into()));
         }
         let (p, version, _, _) = self.load_policy(id)?;
         let nv = version + 1;
@@ -1004,7 +1004,7 @@ impl Vault {
             params![id, nv, n, c, mac, now_ms()],
         )?;
         self.conn.execute("UPDATE leaks SET resolved_at=?2 WHERE secret_id=?1 AND resolved_at IS NULL", params![id, now_ms()])?;
-        self.log(LogInput::new("rotate_key", &p.name, "ok").detail("значение заменено, отметки об утечке сняты"))?;
+        self.log(LogInput::new("rotate_key", &p.name, "ok").detail("value replaced, leak marks cleared"))?;
         self.get_meta(id)
     }
 
@@ -1087,7 +1087,7 @@ impl Vault {
     pub fn dismiss_leaks(&mut self, id: &str) -> Result<()> {
         let p = self.policy_of(id)?;
         self.conn.execute("UPDATE leaks SET resolved_at=?2 WHERE secret_id=?1 AND resolved_at IS NULL", params![id, now_ms()])?;
-        self.log(LogInput::new("dismiss_leak", &p.name, "ok").detail("отметка снята без замены значения"))
+        self.log(LogInput::new("dismiss_leak", &p.name, "ok").detail("leak mark cleared without replacing the value"))
     }
 
     /// Finds full stored values (and their common encodings) inside `text`.
@@ -1114,7 +1114,7 @@ impl Vault {
     pub fn create_client(&mut self, name: &str) -> Result<(Client, String)> {
         let name = name.trim();
         if !valid_key_name(name) {
-            return Err(Error::Invalid("имя клиента: строчные латинские буквы, цифры и . _ / -".into()));
+            return Err(Error::Invalid("client name: only lowercase Latin letters, digits and . _ / -".into()));
         }
         let token = format!("kh_{}", BASE32_NOPAD.encode(&crypto::random_bytes::<32>()).to_lowercase());
         let th = crypto::sha256(token.as_bytes());
@@ -1125,7 +1125,7 @@ impl Vault {
                 "INSERT INTO clients(id, name, token_hash, created_at, mac) VALUES(?1, ?2, ?3, ?4, ?5)",
                 params![id, name, th, now_ms(), mac],
             )
-            .map_err(|_| Error::Invalid(format!("клиент «{name}» уже есть")))?;
+            .map_err(|_| Error::Invalid(format!("client \"{name}\" already exists")))?;
         self.log(LogInput::new("add_client", name, "ok"))?;
         let c = self.list_clients()?.into_iter().find(|c| c.id == id).ok_or_else(|| Error::NotFound(id))?;
         Ok((c, token))
@@ -1294,14 +1294,14 @@ impl Vault {
             let hash: Vec<u8> = r.get(9)?;
             let mac: Vec<u8> = r.get(10)?;
             if seq != expected_seq {
-                return Ok(bad(expected_seq, "пропущены записи", count));
+                return Ok(bad(expected_seq, "entries are missing", count));
             }
             if !crypto::ct_eq(&prev_hash, &prev) {
-                return Ok(bad(seq, "разрыв цепочки", count));
+                return Ok(bad(seq, "the chain is broken", count));
             }
             let h = crypto::sha256(&[&prev[..], &Self::entry_canonical(seq, ts, &e)].concat());
             if !crypto::ct_eq(&h, &hash) || !crypto::hmac_verify(&k.log, &hash, &mac) {
-                return Ok(bad(seq, "запись изменена", count));
+                return Ok(bad(seq, "an entry was changed", count));
             }
             prev = hash;
             expected_seq += 1;
@@ -1309,23 +1309,23 @@ impl Vault {
         }
         match self.meta_get_signed("log_head") {
             Ok(Some(v)) => {
-                let head: LogHead = serde_json::from_slice(&v).map_err(|_| Error::Integrity("голова журнала".into()))?;
+                let head: LogHead = serde_json::from_slice(&v).map_err(|_| Error::Integrity("log head is damaged".into()))?;
                 if head.count != count || head.hash != hex(&prev) {
-                    return Ok(bad(count + 1, "удалены последние записи", count));
+                    return Ok(bad(count + 1, "the latest entries were removed", count));
                 }
             }
             Ok(None) if count == 0 => {}
-            Ok(None) => return Ok(bad(1, "нет подписи головы журнала", count)),
-            Err(_) => return Ok(bad(count, "подпись головы журнала не сходится", count)),
+            Ok(None) => return Ok(bad(1, "the log head signature is missing", count)),
+            Err(_) => return Ok(bad(count, "the log head signature does not match", count)),
         }
-        Ok(ChainStatus { ok: true, entries: count, first_bad_seq: None, message: "цепочка цела".into() })
+        Ok(ChainStatus { ok: true, entries: count, first_bad_seq: None, message: "the chain is intact".into() })
     }
 
     // ---------- permission presets ----------
 
     pub fn presets(&self) -> Result<Vec<Preset>> {
         match self.meta_get_signed("presets")? {
-            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("пресеты повреждены".into())),
+            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("presets are damaged".into())),
             None => Ok(Vec::new()),
         }
     }
@@ -1338,15 +1338,15 @@ impl Vault {
         self.keys()?;
         let name = sanitize_untrusted(name, 32);
         if name.is_empty() {
-            return Err(Error::Invalid("имя пресета: от 1 до 32 символов".into()));
+            return Err(Error::Invalid("preset name: 1 to 32 characters".into()));
         }
         if keys.is_empty() || keys.len() > 32 {
-            return Err(Error::Invalid("в пресете от 1 до 32 ключей".into()));
+            return Err(Error::Invalid("a preset holds 1 to 32 keys".into()));
         }
         let metas = self.list_secrets()?;
         let known: Vec<String> = keys.iter().filter(|k| metas.iter().any(|m| &m.name == *k)).cloned().collect();
         if known.is_empty() {
-            return Err(Error::Invalid("ни одного из этих ключей нет в хранилище".into()));
+            return Err(Error::Invalid("none of these keys are in the vault".into()));
         }
         let preset = Preset { name: name.clone(), keys: known, ttl_minutes: ttl_minutes.clamp(1, 24 * 60), created_at: now_ms() };
         let mut list = self.presets()?;
@@ -1355,7 +1355,7 @@ impl Vault {
             None => list.push(preset),
         }
         self.store_presets(&list)?;
-        self.log(LogInput::new("save_preset", &name, "ok").detail(format!("{} ключей", list.iter().find(|p| p.name == name).map(|p| p.keys.len()).unwrap_or(0))))?;
+        self.log(LogInput::new("save_preset", &name, "ok").detail(format!("{} keys", list.iter().find(|p| p.name == name).map(|p| p.keys.len()).unwrap_or(0))))?;
         Ok(list)
     }
 
@@ -1365,7 +1365,7 @@ impl Vault {
         let before = list.len();
         list.retain(|p| p.name != name);
         if list.len() == before {
-            return Err(Error::NotFound(format!("пресет «{name}»")));
+            return Err(Error::NotFound(format!("preset \"{name}\"")));
         }
         self.store_presets(&list)?;
         self.log(LogInput::new("delete_preset", name, "ok"))?;
@@ -1377,7 +1377,7 @@ impl Vault {
     /// Re-wraps the two data keys under a new master password. Values are not touched.
     pub fn change_password(&mut self, new_password: &str) -> Result<()> {
         if new_password.chars().count() < 10 {
-            return Err(Error::Invalid("мастер-пароль должен быть не короче 10 символов".into()));
+            return Err(Error::Invalid("the master password must be at least 10 characters long".into()));
         }
         {
             let k = self.keys()?;
@@ -1403,14 +1403,14 @@ impl Vault {
                 }
             }
         }
-        self.log(LogInput::new("change_password", "vault", "ok").detail("мастер-пароль изменён"))?;
+        self.log(LogInput::new("change_password", "vault", "ok").detail("master password changed"))?;
         Ok(())
     }
 
     pub fn set_antiphish(&mut self, word: &str) -> Result<()> {
         let w = word.trim();
         if w.chars().count() < 3 || w.chars().count() > 32 {
-            return Err(Error::Invalid("анти-фишинговое слово: от 3 до 32 символов".into()));
+            return Err(Error::Invalid("anti-phishing word: 3 to 32 characters".into()));
         }
         let blob = {
             let k = self.keys()?;
@@ -1418,7 +1418,7 @@ impl Vault {
             [n, ct].concat()
         };
         self.meta_set("antiphish", &blob)?;
-        self.log(LogInput::new("change_antiphish", "vault", "ok").detail("анти-фишинговое слово изменено"))?;
+        self.log(LogInput::new("change_antiphish", "vault", "ok").detail("anti-phishing word changed"))?;
         Ok(())
     }
 
@@ -1428,7 +1428,7 @@ impl Vault {
     pub fn begin_totp_reissue(&mut self) -> Result<String> {
         self.keys()?;
         if self.pending_totp.is_some() {
-            return Err(Error::Invalid("перевыпуск уже начат".into()));
+            return Err(Error::Invalid("authenticator reissue is already in progress".into()));
         }
         let seed = totp::new_seed().to_vec();
         let uri = totp::otpauth_uri(&seed, "vault");
@@ -1438,7 +1438,7 @@ impl Vault {
 
     /// Commits the new seed after a code from it checks out; returns the fresh recovery codes.
     pub fn finish_totp_reissue(&mut self, code: &str) -> Result<Vec<String>> {
-        let seed = self.pending_totp.clone().ok_or_else(|| Error::Invalid("перевыпуск не начат".into()))?;
+        let seed = self.pending_totp.clone().ok_or_else(|| Error::Invalid("authenticator reissue has not been started".into()))?;
         let step = totp::verify(&seed, code, now_ms() / 1000, 0).ok_or(Error::BadCode)?;
         {
             let k = self.keys()?;
@@ -1454,7 +1454,7 @@ impl Vault {
         self.pending_recovery = false;
         // New codes replace all old ones, including the one used to start a recovery.
         let codes = self.regenerate_recovery()?;
-        self.log(LogInput::new("reissue_totp", "vault", "ok").detail("аутентификатор перевыпущен"))?;
+        self.log(LogInput::new("reissue_totp", "vault", "ok").detail("authenticator reissued"))?;
         Ok(codes)
     }
 
@@ -1473,7 +1473,7 @@ impl Vault {
 
     fn recovery_hashes(&self) -> Result<Vec<String>> {
         match self.meta_get_signed("recovery")? {
-            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("коды восстановления повреждены".into())),
+            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("recovery codes are damaged".into())),
             None => Ok(Vec::new()),
         }
     }
@@ -1483,7 +1483,7 @@ impl Vault {
         self.keys()?;
         let rec = self.recovery_hashes()?;
         if rec.is_empty() {
-            return Err(Error::Invalid("коды восстановления не заданы".into()));
+            return Err(Error::Invalid("recovery codes are not set".into()));
         }
         let c = code.trim().to_uppercase();
         let hash = hex(&crypto::sha256(&[&self.vault_id[..], c.as_bytes()].concat()));
@@ -1493,7 +1493,7 @@ impl Vault {
         let mut rest = rec;
         rest.remove(pos);
         self.meta_set_signed("recovery", &serde_json::to_vec(&rest).expect("serialize"))?;
-        self.log(LogInput::new("recovery_code", "vault", "ok").detail(format!("код восстановления использован, осталось {}", rest.len())))?;
+        self.log(LogInput::new("recovery_code", "vault", "ok").detail(format!("recovery code used, {} left", rest.len())))?;
         Ok(())
     }
 
@@ -1511,7 +1511,7 @@ impl Vault {
         self.pending_totp = None;
         let uri = self.begin_totp_reissue()?;
         self.pending_recovery = true;
-        self.log(LogInput::new("recovery_code", "vault", "ok").detail("начато восстановление аутентификатора"))?;
+        self.log(LogInput::new("recovery_code", "vault", "ok").detail("authenticator recovery started"))?;
         Ok(uri)
     }
 
@@ -1533,10 +1533,10 @@ impl Vault {
     pub fn write_anchor(&self) -> Result<()> {
         let path = self.settings()?.anchor_path;
         if path.trim().is_empty() {
-            return Err(Error::Invalid("не задан путь для якоря журнала".into()));
+            return Err(Error::Invalid("no path set for the log anchor".into()));
         }
         let head: LogHead = match self.meta_get_signed("log_head")? {
-            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("голова журнала".into()))?,
+            Some(v) => serde_json::from_slice(&v).map_err(|_| Error::Integrity("log head is damaged".into()))?,
             None => LogHead { count: 0, hash: hex(&[0u8; 32]) },
         };
         let line = format!("kh1|{}|{}|{}\n", head.count, head.hash, now_ms());
@@ -1565,7 +1565,7 @@ impl Vault {
             crate::dpapi::protect(&plain)?
         };
         self.meta_set("wrap_dpapi", &blob)?;
-        self.log(LogInput::new("dpapi", "vault", "ok").detail("ключи доступны службе без мастер-пароля"))?;
+        self.log(LogInput::new("dpapi", "vault", "ok").detail("keys available to the service without the master password"))?;
         Ok(())
     }
 
@@ -1574,7 +1574,7 @@ impl Vault {
         for k in ["wrap_dpapi", "wrap_dpapi.mac"] {
             self.conn.execute("DELETE FROM meta WHERE k = ?1", params![k])?;
         }
-        self.log(LogInput::new("dpapi", "vault", "ok").detail("ключи службы больше не хранятся"))?;
+        self.log(LogInput::new("dpapi", "vault", "ok").detail("service keys are no longer stored"))?;
         Ok(())
     }
 
@@ -1583,7 +1583,7 @@ impl Vault {
         let Some(blob) = self.meta_get("wrap_dpapi")? else { return Ok(false) };
         let plain = crate::dpapi::unprotect(&blob).map_err(|_| Error::Crypto)?;
         if plain.len() != 64 {
-            return Err(Error::Integrity("ключи службы повреждены".into()));
+            return Err(Error::Integrity("service keys are damaged".into()));
         }
         let mut everyday = Zeroizing::new([0u8; 32]);
         everyday.copy_from_slice(&plain[..32]);
@@ -1592,7 +1592,7 @@ impl Vault {
         // Trust the keys only once they open the TOTP secret.
         let blob = self.meta_get("totp")?.ok_or(Error::NotInitialized)?;
         if blob.len() < crypto::NONCE_LEN {
-            return Err(Error::Integrity("секрет TOTP повреждён".into()));
+            return Err(Error::Integrity("TOTP secret is damaged".into()));
         }
         let seed = crypto::open(&guarded, &blob[..crypto::NONCE_LEN], &blob[crypto::NONCE_LEN..], &self.aad("totp"))
             .map_err(|_| Error::Crypto)?;
@@ -1606,7 +1606,7 @@ impl Vault {
         for (ts, entry) in pending {
             self.append_log(ts, entry)?;
         }
-        self.log(LogInput::new("unlock", "vault", "ok").detail("служба восстановила ключи (DPAPI)"))?;
+        self.log(LogInput::new("unlock", "vault", "ok").detail("service restored the keys (DPAPI)"))?;
         Ok(true)
     }
 }
@@ -1630,7 +1630,7 @@ mod tests {
     fn setup() -> (tempfile::TempDir, Vault) {
         let dir = tempfile::tempdir().unwrap();
         let mut v = Vault::open(&dir.path().join("vault.db")).unwrap();
-        let p = PendingSetup::new("correct horse battery", "сова").unwrap();
+        let p = PendingSetup::new("correct horse battery", "owl").unwrap();
         let code = totp::code_at_step(&p.seed, totp::step_at(now_ms() / 1000));
         v.finish_setup(&p, &code).unwrap();
         (dir, v)
@@ -1839,7 +1839,7 @@ mod tests {
         old.unlock("correct horse battery").unwrap();
         assert_eq!(old.list_secrets().unwrap().len(), 1);
         // A new vault can be created in place, and its log starts with the reset.
-        let p = PendingSetup::new("another long password", "ёжик").unwrap();
+        let p = PendingSetup::new("another long password", "hedgehog").unwrap();
         let code = totp::code_at_step(&p.seed, totp::step_at(now_ms() / 1000));
         v.finish_setup(&p, &code).unwrap();
         let log = v.list_log(10, None).unwrap();
@@ -1849,7 +1849,7 @@ mod tests {
     }
 
     #[test]
-    fn russian_names_only_for_sealed_keys() {
+    fn non_latin_names_only_for_sealed_keys() {
         let (_d, mut v) = setup();
         let mut note = new_key("личное/почта", Tier::Sealed);
         note.group = "личное".into();
@@ -1857,7 +1857,7 @@ mod tests {
         assert_eq!(v.get_meta_by_name("личное/почта").unwrap().id, m.id);
         // A key agents can ask for keeps a Latin name.
         let err = v.add_secret(new_key("почта", Tier::Soft)).unwrap_err().to_string();
-        assert!(err.contains("только у запечатанных"), "{err}");
+        assert!(err.contains("only allowed for sealed keys"), "{err}");
         // Opening the note to agents needs a Latin name and group first.
         let to_soft = MetaPatch { tier: Some(Tier::Soft), ..Default::default() };
         assert!(v.update_meta(&m.id, &to_soft, true).is_err());

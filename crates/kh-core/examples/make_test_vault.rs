@@ -9,7 +9,7 @@ use kh_core::{now_ms, totp, Mode, NewSecret, Tier, Vault};
 fn main() {
     let dir = std::env::args().nth(1).expect("usage: make_test_vault <dir>");
     let mut v = Vault::open(&std::path::Path::new(&dir).join("vault.db")).unwrap();
-    let p = PendingSetup::new("test-password-123", "тест").unwrap();
+    let p = PendingSetup::new("test-password-123", "test").unwrap();
     let seed = BASE32_NOPAD.decode(p.seed_base32().as_bytes()).unwrap();
     // Use the previous step so the next real code (current step) is still accepted.
     let code = totp::code_at_step(&seed, totp::step_at(now_ms() / 1000) - 1);

@@ -61,7 +61,7 @@ pub trait Events: Send + Sync {
     /// Ask the human to prove presence (Windows Hello) with `message` shown in the system
     /// dialog. Only implementations that run the dialog themselves may return `Ok`.
     fn verify_presence(&self, _message: &str) -> Result<(), String> {
-        Err("Windows Hello здесь недоступен".into())
+        Err("Windows Hello is not available here".into())
     }
 }
 
@@ -150,7 +150,7 @@ impl Daemon {
         let events = self.events.read().unwrap_or_else(|x| x.into_inner()).clone();
         match events {
             Some(e) => e.verify_presence(message),
-            None => Err("Windows Hello здесь недоступен".into()),
+            None => Err("Windows Hello is not available here".into()),
         }
     }
 
@@ -198,7 +198,7 @@ impl Daemon {
 
     /// Before the vault moves into the service: drop the keys and make the file self-contained.
     pub fn prepare_migration(&self) -> Result<(), String> {
-        self.lock_vault("переход в режим службы");
+        self.lock_vault("switching to service mode");
         self.vault().checkpoint().map_err(err_str)
     }
 
@@ -212,7 +212,7 @@ impl Daemon {
             self.elevated_until.store(0, Ordering::Relaxed);
             self.set_ui_unlocked(false);
         } else {
-            self.lock_vault("сеанс Windows заблокирован");
+            self.lock_vault("the Windows session was locked");
         }
     }
 

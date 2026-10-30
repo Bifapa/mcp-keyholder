@@ -18,7 +18,7 @@ pub enum Field {
 }
 
 /// Everything the window shows. `facts` come from the core (verified), `agent_note`
-/// comes from the agent and is shown with a "со слов агента" mark.
+/// comes from the agent and is shown with an "as the agent claims" mark.
 pub struct Prompt {
     pub heading: String,
     pub facts: Vec<(String, String)>,
@@ -48,7 +48,7 @@ mod other {
     }
 
     pub fn prompt(_p: Prompt) -> Result<Answer, String> {
-        Err("отдельный рабочий стол есть только в Windows".into())
+        Err("the separate desktop is only available on Windows".into())
     }
 }
 
@@ -63,21 +63,23 @@ mod win {
 
     use windows_sys::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
     use windows_sys::Win32::Graphics::Gdi::{
-        BeginPaint, CreateFontW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect, InvalidateRect,
+        BeginPaint, CreateFontW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect, FrameRect, InvalidateRect,
         SelectObject, SetBkColor, SetBkMode, SetTextColor, UpdateWindow, HBRUSH, HFONT, PAINTSTRUCT, TRANSPARENT,
     };
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::System::StationsAndDesktops::{
         CloseDesktop, CreateDesktopW, OpenDesktopW, OpenInputDesktop, SetThreadDesktop, SwitchDesktop, HDESK,
     };
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_ESCAPE};
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
         GetSystemMetrics, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, KillTimer, LoadCursorW,
-        PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer, ShowWindow, TranslateMessage,
+        PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer, SetWindowDisplayAffinity, ShowWindow,
+        TranslateMessage, WDA_EXCLUDEFROMCAPTURE,
         IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLOREDIT,
         WM_DESTROY, WM_ERASEBKGND,
-        WM_KEYDOWN, WM_LBUTTONDOWN, WM_PAINT, WM_TIMER, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_APPWINDOW,
+        WM_KEYDOWN, WM_LBUTTONDOWN, WM_PAINT, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
+        WS_EX_APPWINDOW,
         WS_EX_TOPMOST, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     };
 
@@ -148,6 +150,7 @@ mod win {
     const MUTED: u32 = 0xC09DA4; // #A49DC0
     const ACCENT: u32 = 0xE04A6D; // #6D4AE0
     const BORDER: u32 = 0x40272C; // #2C2740
+    const FRAME: u32 = 0x5C4F4A; // #4A4F5C
     const WARN: u32 = 0x4AA1E0; // #E0A14A
     const ON_ACCENT: u32 = 0xFFFFFF;
 
@@ -180,12 +183,13 @@ mod win {
         bg: HBRUSH,
         field_bg: HBRUSH,
         accent: HBRUSH,
+        frame: HBRUSH,
         layout: Layout,
         answer: Option<Answer>,
         /// Buttons stay dead for the first second, so a mis-click cannot approve.
         armed: bool,
         focus: usize,
-        /// The first field shows its characters ("Показать" next to its label).
+        /// The first field shows its characters ("Show" next to its label).
         shown: bool,
     }
 
@@ -207,10 +211,10 @@ mod win {
 
     fn labels(f: Field) -> (&'static str, Option<&'static str>) {
         match f {
-            Field::Pin => ("PIN-код", None),
-            Field::Otp => ("Код из аутентификатора", None),
-            Field::Password => ("Мастер-пароль", None),
-            Field::PasswordOtp => ("Мастер-пароль", Some("Код из аутентификатора")),
+            Field::Pin => ("PIN", None),
+            Field::Otp => ("Authenticator code", None),
+            Field::Password => ("Master password", None),
+            Field::PasswordOtp => ("Master password", Some("Authenticator code")),
         }
     }
 
@@ -218,9 +222,16 @@ mod win {
         !matches!(f, Field::Otp)
     }
 
-    /// The "Показать / Скрыть" toggle on the label line of the first (masked) field.
+    /// The "Show / Hide" toggle on the label line of the first (masked) field.
     fn peek_rect(l: Layout) -> RECT {
         RECT { left: W - PAD - 140, top: l.input1_y - 2, right: W - PAD, bottom: l.input1_y + 20 }
+    }
+
+/// The box around an input whose label sits at `y`. The window draws the frame itself and the
+    /// borderless edit control sits inside it: an edit's own border is non-client paint that the
+    /// window could cover and never get back (the missing top line).
+    fn field_rect(y: i32) -> RECT {
+        RECT { left: PAD, top: y + 22, right: W - PAD, bottom: y + 54 }
     }
 
     unsafe fn wide(s: &str) -> Vec<u16> {
@@ -248,7 +259,7 @@ mod win {
                 let r = run(p);
                 let _ = tx.send(r);
             })
-            .map_err(|e| format!("не удалось открыть окно подтверждения: {e}"))?;
+            .map_err(|e| format!("could not open the confirmation window: {e}"))?;
         // Watchdog. The window cancels itself after the give-up timer; on top of that, if it has
         // not appeared within APPEAR_MS, stops beating for HANG_MS, or outlives the timer, the
         // screen is switched back from here. The human is never left on an empty desktop.
@@ -260,7 +271,7 @@ mod win {
                 Ok(r) => return r,
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     unsafe { emergency_restore() };
-                    return Err("окно подтверждения закрылось с ошибкой".into());
+                    return Err("the confirmation window closed with an error".into());
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     let h = CURRENT_HWND.load(std::sync::atomic::Ordering::SeqCst);
@@ -276,9 +287,9 @@ mod win {
                         }
                         let _ = rx.recv_timeout(std::time::Duration::from_secs(2));
                         return Err(if !appeared {
-                            "окно подтверждения не открылось — обычный рабочий стол возвращён".into()
+                            "the confirmation window did not open — switched back to the normal desktop".into()
                         } else {
-                            "окно подтверждения не ответило — обычный рабочий стол возвращён".into()
+                            "the confirmation window did not respond — switched back to the normal desktop".into()
                         });
                     }
                 }
@@ -302,14 +313,14 @@ mod win {
                     if !prev.is_null() {
                         CloseDesktop(prev);
                     }
-                    return Err(format!("не удалось создать рабочий стол (ошибка {})", GetLastError()));
+                    return Err(format!("could not create the desktop (error {})", GetLastError()));
                 }
                 if SetThreadDesktop(desk) == 0 || SwitchDesktop(desk) == 0 {
                     CloseDesktop(desk);
                     if !prev.is_null() {
                         CloseDesktop(prev);
                     }
-                    return Err(format!("не удалось переключить рабочий стол (ошибка {})", GetLastError()));
+                    return Err(format!("could not switch the desktop (error {})", GetLastError()));
                 }
                 Ok(DesktopGuard { prev, desk })
             }
@@ -430,7 +441,7 @@ mod win {
         }
 
         if let Some(note) = &u.note {
-            p.text("Со слов агента:", PAD, u.layout.note_y, 220, 18, WARN, f_small, DT_LEFT | DT_SINGLELINE);
+            p.text("From the agent:", PAD, u.layout.note_y, 220, 18, WARN, f_small, DT_LEFT | DT_SINGLELINE);
             p.text(note, PAD, u.layout.note_y + 20, W - PAD * 2, u.layout.note_h - 20, MUTED, f_body, DT_WORDBREAK);
         }
 
@@ -443,7 +454,7 @@ mod win {
         };
         p.fill(phish_box, u.field_bg);
         p.text(
-            "анти-фишинговое слово",
+            "anti-phishing word",
             PAD + 14,
             u.layout.phish_y + 8,
             280,
@@ -464,7 +475,7 @@ mod win {
         p.text(l1, PAD, u.layout.input1_y, 320, 18, MUTED, f_small, DT_LEFT | DT_SINGLELINE);
         if mask_password(u.field) {
             let r = peek_rect(u.layout);
-            let label = if u.shown { "Скрыть" } else { "Показать" };
+            let label = if u.shown { "Hide" } else { "Show" };
             p.text(label, r.left, r.top + 2, r.right - r.left, 18, ACCENT, f_small, DT_RIGHT | DT_SINGLELINE);
         }
         if let Some(l2) = l2 {
@@ -472,14 +483,21 @@ mod win {
                 p.text(l2, PAD, u.layout.input2_y, 320, 18, MUTED, f_small, DT_LEFT | DT_SINGLELINE);
             }
         }
+        let focused = GetFocus() as usize;
+        for (y, edit) in [(u.layout.input1_y, u.edit1), (u.layout.input2_y, u.edit2)] {
+            if y >= 0 {
+                let brush = if edit != 0 && edit == focused { u.accent } else { u.frame };
+                FrameRect(hdc, &field_rect(y), brush);
+            }
+        }
 
         // Buttons: drawn here, hit-tested in WM_LBUTTONDOWN (no WM_COMMAND to spoof).
         let (ok_r, cancel_r) = button_rects(u.layout);
         p.fill(cancel_r, u.field_bg);
-        p.text("Отклонить", cancel_r.left, cancel_r.top, 160, 36, if u.armed { TEXT } else { MUTED }, f_button, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        p.text("Deny", cancel_r.left, cancel_r.top, 160, 36, if u.armed { TEXT } else { MUTED }, f_button, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         p.fill(ok_r, if u.armed { u.accent } else { u.field_bg });
         p.text(
-            "Разрешить",
+            "Allow",
             ok_r.left,
             ok_r.top,
             160,
@@ -538,6 +556,10 @@ mod win {
                 // IsDialogMessage turns Esc inside an edit field into IDCANCEL.
                 if (w & 0xffff) == 2 {
                     finish(hwnd, false);
+                }
+                // EN_SETFOCUS / EN_KILLFOCUS: repaint the field frames.
+                if matches!((w >> 16) & 0xffff, 0x0100 | 0x0200) {
+                    InvalidateRect(hwnd, null_mut(), 0);
                 }
                 0
             }
@@ -672,10 +694,10 @@ mod win {
         // Copy what is needed and release UI: creating controls and moving focus send messages
         // back into wndproc, which locks UI too — holding it here deadlocked the window before it
         // ever appeared (black desktop, cursor only).
-        let (field, layout) = {
+        let (field, layout, font) = {
             let g = UI.lock().unwrap_or_else(|e| e.into_inner());
             match g.as_ref() {
-                Some(u) => (u.field, u.layout),
+                Some(u) => (u.field, u.layout, u.fonts[1]),
                 None => return,
             }
         };
@@ -687,17 +709,18 @@ mod win {
                 0,
                 class.as_ptr(),
                 wide("").as_ptr(),
-                WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | pass_style | 0x0080, // ES_AUTOHSCROLL
-                PAD,
-                y + 22,
-                W - PAD * 2,
-                30,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | pass_style | 0x0080, // ES_AUTOHSCROLL
+                PAD + 10,
+                field_rect(y).top + 6,
+                W - PAD * 2 - 20,
+                20,
                 hwnd,
                 id as usize as *mut c_void,
                 hinst,
                 null_mut(),
             );
             SendMessageW(e, 0x00C5, 64, 0); // EM_SETLIMITTEXT
+            SendMessageW(e, WM_SETFONT, font as usize, 0);
             e
         };
         let e1 = make(ID_EDIT1, layout.input1_y);
@@ -718,7 +741,7 @@ mod win {
         // A previous prompt that never finished still holds the state: refuse before touching
         // the screen rather than switch to a desktop nobody can draw on.
         if UI.try_lock().is_err() {
-            return Err("предыдущее окно подтверждения ещё не закрылось".into());
+            return Err("the previous confirmation window has not closed yet".into());
         }
         let _desktop = match TEST_NO_SWITCH.load(std::sync::atomic::Ordering::Relaxed) {
             true => None,
@@ -762,6 +785,7 @@ mod win {
                     bg: CreateSolidBrush(BG),
                     field_bg: CreateSolidBrush(BORDER),
                     accent: CreateSolidBrush(ACCENT),
+                    frame: CreateSolidBrush(FRAME),
                     layout,
                     answer: None,
                     armed: false,
@@ -771,7 +795,7 @@ mod win {
             }
 
             // The layout is in client coordinates; the window adds the caption and borders.
-            let style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE;
+            let style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_CLIPCHILDREN;
             let ex_style = WS_EX_TOPMOST | WS_EX_APPWINDOW;
             let mut outer = RECT { left: 0, top: 0, right: W, bottom: layout.height };
             AdjustWindowRectEx(&mut outer, style, 0, ex_style);
@@ -780,7 +804,7 @@ mod win {
             let sh = GetSystemMetrics(SM_CYSCREEN);
             let x = (sw - ow) / 2;
             let y = ((sh - oh) / 2).max(20);
-            let title = wide("MCP Keyholder — подтверждение");
+            let title = wide("MCP Keyholder — confirmation");
             let hwnd = CreateWindowExW(
                 ex_style,
                 class_name.as_ptr(),
@@ -798,7 +822,7 @@ mod win {
             if hwnd.is_null() {
                 let code = GetLastError();
                 clear_state();
-                return Err(format!("не удалось создать окно (ошибка {code})"));
+                return Err(format!("could not create the window (error {code})"));
             }
             {
                 let mut g = UI.lock().unwrap_or_else(|e| e.into_inner());
@@ -808,6 +832,11 @@ mod win {
             }
             CURRENT_HWND.store(hwnd as usize, std::sync::atomic::Ordering::SeqCst);
             APPEARED.store(true, std::sync::atomic::Ordering::SeqCst);
+            // Screen capture gets a black box instead of the window (the anti-phishing word must
+            // not end up in a screenshot). Debug builds stay capturable for design review.
+            if !cfg!(debug_assertions) {
+                SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+            }
             ShowWindow(hwnd, SW_SHOW);
             UpdateWindow(hwnd);
             InvalidateRect(hwnd, null_mut(), 1);
@@ -823,8 +852,8 @@ mod win {
             let answer = clear_state();
             match answer {
                 Some(a) if !a.first.trim().is_empty() => Ok(a),
-                Some(_) => Err("пустой ввод".into()),
-                None => Err("отменено".into()),
+                Some(_) => Err("empty input".into()),
+                None => Err("cancelled".into()),
             }
         }
     }
@@ -840,6 +869,7 @@ mod win {
             DeleteObject(u.bg as _);
             DeleteObject(u.field_bg as _);
             DeleteObject(u.accent as _);
+            DeleteObject(u.frame as _);
         }
         *g = None;
         answer

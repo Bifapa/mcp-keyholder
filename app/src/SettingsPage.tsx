@@ -18,11 +18,11 @@ import { exportVault, VaultFileImport } from "./vaultfile";
 /** Changes the core accepts only after a step-up; mirrors `set_settings` in the core. */
 function confirmReasons(a: Settings, b: Settings): string[] {
   const r: string[] = [];
-  if (b.autolockMinutes > a.autolockMinutes) r.push("автоблокировка дольше");
-  if (b.maxTtlMinutes > a.maxTtlMinutes) r.push("максимальный срок больше");
-  if (a.secureDesktop && !b.secureDesktop) r.push("отдельный рабочий стол выключается");
-  if (b.anchorPath && b.anchorPath !== a.anchorPath) r.push("новый файл якоря");
-  if (b.fullLock !== a.fullLock) r.push("полная блокировка");
+  if (b.autolockMinutes > a.autolockMinutes) r.push("auto-lock made longer");
+  if (b.maxTtlMinutes > a.maxTtlMinutes) r.push("maximum duration made longer");
+  if (a.secureDesktop && !b.secureDesktop) r.push("separate desktop turned off");
+  if (b.anchorPath && b.anchorPath !== a.anchorPath) r.push("new anchor file");
+  if (b.fullLock !== a.fullLock) r.push("full lock changed");
   return r;
 }
 
@@ -45,17 +45,17 @@ function ConfirmLegend() {
       <span className="lock-badge">{left > 0 ? Icon.check(16) : Icon.lock(16)}</span>
       <div className="col grow" style={{ gap: 2 }}>
         <span style={{ fontWeight: 600 }}>
-          {left > 0 ? `Подтверждено — ещё ${time}` : "Кнопки с замком спрашивают мастер-пароль и код"}
+          {left > 0 ? `Confirmed — ${time} left` : "Buttons with a lock ask for your master password and code"}
         </span>
         <span className="small">
           {left > 0
-            ? "Пока идёт отсчёт, действия с замком выполняются без повторного ввода."
-            : "Пароль и код из аутентификатора вводятся один раз, в отдельном окне MCP Keyholder. После этого 3 минуты настройки меняются без повторного ввода."}
+            ? "While the countdown runs, actions with a lock go through without asking again."
+            : "You enter the password and authenticator code once, in a separate MCP Keyholder window. After that, settings can be changed for 3 minutes without entering them again."}
         </span>
       </div>
       {left > 0 && (
         <button className="btn sm outline" onClick={end}>
-          Завершить
+          End now
         </button>
       )}
     </div>
@@ -94,7 +94,7 @@ export function SettingsPage({ status }: { status: AppStatus }) {
       const r = await stepup(() => api.setSettings(s).then(() => true));
       if (r) {
         setOrig(s);
-        setNote("Сохранено");
+        setNote("Saved");
       }
     } catch (e) {
       setError(errText(e));
@@ -110,44 +110,44 @@ export function SettingsPage({ status }: { status: AppStatus }) {
 
   return (
     <>
-      <h1>Настройки</h1>
+      <h1>Settings</h1>
       <ConfirmLegend />
       <div className="card pad col" style={{ gap: 14 }}>
-        <h2>Оформление</h2>
+        <h2>Appearance</h2>
         <Segmented<Theme>
-          label="Тема"
+          label="Theme"
           value={theme}
           onChange={(t) => {
             setTheme(t);
             applyTheme(t);
           }}
           options={[
-            { id: "system", label: "Как в системе" },
-            { id: "light", label: "Светлая" },
-            { id: "dark", label: "Тёмная" },
+            { id: "system", label: "System" },
+            { id: "light", label: "Light" },
+            { id: "dark", label: "Dark" },
           ]}
         />
       </div>
       {s && (
         <div className="card pad col" style={{ gap: 14 }}>
-          <h2>Защита</h2>
+          <h2>Protection</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
             <label className="field">
-              Автоблокировка, минут
+              Auto-lock, minutes
               <input className="input" type="number" min={1} max={1440} value={s.autolockMinutes} onChange={num("autolockMinutes")} />
             </label>
             <label className="field">
-              Срок разрешения по умолчанию, минут
+              Default grant duration, minutes
               <input className="input" type="number" min={1} value={s.defaultTtlMinutes} onChange={num("defaultTtlMinutes")} />
             </label>
             <label className="field">
-              Максимальный срок, минут
+              Maximum duration, minutes
               <input className="input" type="number" min={1} value={s.maxTtlMinutes} onChange={num("maxTtlMinutes")} />
             </label>
           </div>
           <label className="row small">
             <input type="checkbox" checked={s.disableOnLeakReport} onChange={(e) => edit({ disableOnLeakReport: e.target.checked })} />
-            Отключать ключ, когда агент сообщает об утечке
+            Disable a key when an agent reports a leak
           </label>
           <label className="row small">
             <input
@@ -156,24 +156,24 @@ export function SettingsPage({ status }: { status: AppStatus }) {
               disabled={!status.desktopAvailable}
               onChange={(e) => edit({ secureDesktop: e.target.checked })}
             />
-            Подтверждать PIN, OTP и пароль на отдельном рабочем столе Windows
+            Confirm PIN, OTP and password on a separate Windows desktop
           </label>
           <label className="field">
-            Якорь журнала: файл для головы цепочки (пусто — выключено)
+            Log anchor: file for the chain head (empty — off)
             <input
               className="input mono"
               placeholder="D:\backup\keyholder-anchor.txt"
               value={s.anchorPath}
               onChange={(e) => edit({ anchorPath: e.target.value })}
             />
-            <span className="hint">Каждая запись — строка с номером и хэшем. Если база откатится, по якорю это будет видно.</span>
+            <span className="hint">Each entry is a line with a number and a hash. If the database is rolled back, the anchor will show it.</span>
           </label>
           {service && (
             <>
               <div className="col" style={{ gap: 6 }}>
-                <span className="field-title">Вход в интерфейс {Icon.lock(13)}</span>
+                <span className="field-title">Interface sign-in {Icon.lock(13)}</span>
                 <Segmented<LoginMode>
-                  label="Вход в интерфейс"
+                  label="Interface sign-in"
                   value={s.loginMode}
                   onChange={async (m) => {
                     if (m === s.loginMode) return;
@@ -184,46 +184,46 @@ export function SettingsPage({ status }: { status: AppStatus }) {
                       if (!r) return;
                       setS({ ...s, loginMode: m });
                       setOrig((o) => (o ? { ...o, loginMode: m } : o));
-                      setNote("Способ входа изменён");
+                      setNote("Sign-in method changed");
                     } catch (e) {
                       setError(errText(e));
                     }
                   }}
                   options={[
-                    { id: "nothing", label: "Ничего" },
+                    { id: "nothing", label: "Nothing" },
                     { id: "pin", label: "PIN" },
                     { id: "otp", label: "OTP" },
-                    { id: "password", label: "Пароль" },
+                    { id: "password", label: "Password" },
                   ]}
                 />
-                <span className="hint">Применяется сразу. Служба хранит ключи хранилища у себя (DPAPI), поэтому вход может быть коротким.</span>
+                <span className="hint">Applies at once. The service keeps the vault keys itself (DPAPI), so sign-in can be short.</span>
               </div>
               <label className="row small">
                 <input type="checkbox" checked={s.fullLock} onChange={(e) => edit({ fullLock: e.target.checked })} />
-                Полная блокировка: при автоблокировке служба забывает ключи до ввода мастер-пароля
+                Full lock: on auto-lock the service forgets the keys until the master password is entered
               </label>
             </>
           )}
           <p className="hint">
-            Ужесточать можно сразу. Ослабление защиты — более долгие сроки, выключение отдельного рабочего стола, новый файл якоря —
-            сохраняется после подтверждения паролем и кодом.
+            Tightening applies right away. Loosening protection — longer durations, turning off the separate desktop, a new anchor file —
+            is saved after you confirm with your password and code.
           </p>
           <div className="row wrap">
             {reasons.length > 0 ? (
               <LockedButton className="primary" disabled={!dirty} onClick={save}>
-                Сохранить
+                Save
               </LockedButton>
             ) : (
               <button className="btn primary" disabled={!dirty} onClick={save}>
-                Сохранить
+                Save
               </button>
             )}
-            <button className="btn" onClick={() => api.anchorNow().then(() => setNote("Якорь записан"), (e) => setError(errText(e)))}>
-              Записать якорь сейчас
+            <button className="btn" onClick={() => api.anchorNow().then(() => setNote("Anchor written"), (e) => setError(errText(e)))}>
+              Write anchor now
             </button>
             {dirty ? (
               <span className="small muted">
-                {reasons.length > 0 ? `Нужно подтверждение: ${reasons.join(", ")}` : "Есть несохранённые изменения"}
+                {reasons.length > 0 ? `Needs confirmation: ${reasons.join(", ")}` : "Unsaved changes"}
               </span>
             ) : (
               <Done text={note} />
@@ -240,21 +240,21 @@ export function SettingsPage({ status }: { status: AppStatus }) {
       <PresetsCard />
       <ServiceCard status={status} />
       <div className="card pad col">
-        <h2>О программе</h2>
+        <h2>About</h2>
         <dl className="fact" style={{ gridTemplateColumns: "160px 1fr", margin: 0 }}>
-          <dt>Версия</dt>
-          <dd>{status.version} · {service ? "режим службы" : "портативный режим"}</dd>
-          <dt>Хранилище</dt>
+          <dt>Version</dt>
+          <dd>{status.version} · {service ? "service mode" : "portable mode"}</dd>
+          <dt>Vault</dt>
           <dd className="mono small">{status.vaultPath}</dd>
-          <dt>Данные</dt>
+          <dt>Data</dt>
           <dd className="mono small">{status.dataDir}</dd>
-          <dt>kh (для агентов)</dt>
+          <dt>kh (for agents)</dt>
           <dd className="mono small">{status.khPath}</dd>
         </dl>
         <UpdateSettings version={status.version} service={service} />
         <p className="hint">
-          Портативный режим защищает от агента, который пользуется MCP, файлами и окнами. От программы, которая сознательно читает
-          память MCP Keyholder, защищает режим службы: ядро работает под отдельной учётной записью. Подробности — CONCEPT.md, раздел 11.
+          Portable mode protects against an agent that uses MCP, files and windows. Service mode protects against a program that
+          deliberately reads MCP Keyholder's memory: the core runs under a separate account. Details: CONCEPT.md, section 11.
         </p>
       </div>
     </>
@@ -269,20 +269,20 @@ function PresetsCard() {
   }, []);
   return (
     <div className="card pad col" style={{ gap: 12 }}>
-      <h2>Пресеты разрешений</h2>
+      <h2>Grant presets</h2>
       <p className="muted small">
-        Набор ключей и срок, которые агент может запросить одним словом: <span className="mono">request_grant({"{ preset }"})</span>.
-        Пресет сохраняется кнопкой в окне подтверждения и всё равно требует подтверждения человека.
+        A set of keys and a duration that an agent can request by one name: <span className="mono">request_grant({"{ preset }"})</span>.
+        A preset is saved with a button in the approval window, and a person still has to approve every request.
       </p>
-      {list.length === 0 && !error && <p className="muted small">Пресетов пока нет.</p>}
+      {list.length === 0 && !error && <p className="muted small">No presets yet.</p>}
       {list.map((p) => (
         <div key={p.name} className="row" style={{ justifyContent: "space-between" }}>
           <span className="mono">{p.name}</span>
           <span className="muted small grow">
-            {p.keys.join(", ")} · {p.ttlMinutes} мин
+            {p.keys.join(", ")} · {p.ttlMinutes} min
           </span>
           <button className="link" onClick={() => api.deletePreset(p.name).then(setList, (e) => setError(errText(e)))}>
-            Удалить
+            Delete
           </button>
         </div>
       ))}
@@ -310,7 +310,7 @@ function PasswordCard() {
       if (!r) return;
       setNext("");
       setNext2("");
-      setNote("Мастер-пароль изменён");
+      setNote("Master password changed");
     } catch (e) {
       setError(errText(e));
     }
@@ -318,23 +318,23 @@ function PasswordCard() {
 
   return (
     <div className="card pad col" style={{ gap: 14 }}>
-      <h2>Мастер-пароль</h2>
-      <p className="muted small">Пароль, которым открывается хранилище. Сами ключи при смене остаются на месте.</p>
+      <h2>Master password</h2>
+      <p className="muted small">The password that opens the vault. Changing it leaves the keys themselves in place.</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
         <label className="field">
-          Новый пароль
+          New password
           <PasswordInput autoComplete="new-password" value={next} onChange={(e) => (setNext(e.target.value), setNote(""))} />
-          <span className={`hint ${tooShort ? "bad" : ""}`}>Не короче 10 символов</span>
+          <span className={`hint ${tooShort ? "bad" : ""}`}>At least 10 characters</span>
         </label>
         <label className="field">
-          Новый пароль ещё раз
+          Repeat new password
           <PasswordInput autoComplete="new-password" value={next2} onChange={(e) => (setNext2(e.target.value), setNote(""))} />
-          {mismatch && <span className="hint bad">Пароли не совпадают</span>}
+          {mismatch && <span className="hint bad">The passwords don't match</span>}
         </label>
       </div>
       <div className="row wrap">
         <LockedButton disabled={!ready} onClick={change}>
-          Сменить пароль
+          Change password
         </LockedButton>
         <Done text={note} />
       </div>
@@ -358,7 +358,7 @@ function WordCard() {
       const r = await stepup(() => api.changeAntiphish(word).then(() => true));
       if (!r) return;
       setWord("");
-      setNote("Слово изменено");
+      setNote("Word changed");
     } catch (e) {
       setError(errText(e));
     }
@@ -366,13 +366,13 @@ function WordCard() {
 
   return (
     <div className="card pad col" style={{ gap: 14 }}>
-      <h2>Анти-фишинговое слово</h2>
+      <h2>Anti-phishing word</h2>
       <p className="muted small">
-        Это слово показывается в каждом настоящем окне подтверждения MCP Keyholder. Если окно просит пароль или код, а слова в нём нет
-        или оно другое — это не MCP Keyholder, ничего не вводите.
+        This word is shown in every genuine MCP Keyholder approval window. If a window asks for a password or code and the word is missing
+        or different, it is not MCP Keyholder — don't enter anything.
       </p>
       <label className="field" style={{ maxWidth: 360 }}>
-        Новое слово
+        New word
         <input
           className="input"
           maxLength={32}
@@ -380,11 +380,11 @@ function WordCard() {
           onChange={(e) => (setWord(e.target.value), setNote(""))}
           onKeyDown={(e) => e.key === "Enter" && ready && change()}
         />
-        <span className={`hint ${word && !ready ? "bad" : ""}`}>От 3 до 32 символов</span>
+        <span className={`hint ${word && !ready ? "bad" : ""}`}>3 to 32 characters</span>
       </label>
       <div className="row wrap">
         <LockedButton disabled={!ready} onClick={change}>
-          Сменить слово
+          Change word
         </LockedButton>
         <Done text={note} />
       </div>
@@ -434,7 +434,7 @@ function TotpCard() {
       setPassword("");
       setRecoveryCode("");
       setLost(false);
-      setNote("Аутентификатор перевыпущен");
+      setNote("Authenticator reissued");
     } catch (e) {
       setError(errText(e));
     }
@@ -442,18 +442,18 @@ function TotpCard() {
 
   return (
     <div className="card pad col" style={{ gap: 14 }}>
-      <h2>Аутентификатор</h2>
+      <h2>Authenticator</h2>
       <p className="muted small">
-        Перевыпустите, если сменили телефон или приложение. Старые коды перестанут работать, появятся новые коды восстановления.
+        Reissue it if you changed your phone or app. Old codes stop working, and you get new recovery codes.
       </p>
       {qr ? (
         <div className="sub-panel col" style={{ gap: 12 }}>
           <span className="small" style={{ fontWeight: 600 }}>
-            Отсканируйте QR в приложении-аутентификаторе и введите код, который оно покажет
+            Scan the QR code with your authenticator app and enter the code it shows
           </span>
-          <img className="qr" alt="Новый QR для приложения-аутентификатора" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />
+          <img className="qr" alt="New QR code for the authenticator app" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />
           <label className="field" style={{ maxWidth: 220 }}>
-            Код из нового приложения
+            Code from the new app
             <input
               className="input otp-input mono"
               inputMode="numeric"
@@ -466,42 +466,42 @@ function TotpCard() {
           </label>
           <div className="row">
             <button className="btn primary" disabled={newCode.length < 6} onClick={finish}>
-              Готово
+              Done
             </button>
             <button className="btn" onClick={cancel}>
-              Отмена
+              Cancel
             </button>
           </div>
         </div>
       ) : (
         <>
           <div className="row wrap">
-            <LockedButton onClick={() => begin(false)} title="Спросит мастер-пароль и код из текущего приложения">
-              Перевыпустить
+            <LockedButton onClick={() => begin(false)} title="Asks for your master password and a code from the current app">
+              Reissue
             </LockedButton>
             <button className="link" onClick={() => setLost((v) => !v)} aria-expanded={lost}>
-              Нет доступа к старому приложению?
+              No access to the old app?
             </button>
             <Done text={note} />
           </div>
           {lost && (
             <div className="sub-panel col" style={{ gap: 12 }}>
               <span className="small muted">
-                Подойдёт один из кодов восстановления, сохранённых при настройке. Каждый код срабатывает один раз.
+                Use one of the recovery codes you saved during setup. Each code works once.
               </span>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
                 <label className="field">
-                  Мастер-пароль
+                  Master password
                   <PasswordInput autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
                 </label>
                 <label className="field">
-                  Код восстановления
+                  Recovery code
                   <input className="input mono" value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())} />
                 </label>
               </div>
               <div className="row">
                 <button className="btn" disabled={!password || recoveryCode.length < 8} onClick={() => begin(true)}>
-                  Перевыпустить по коду восстановления
+                  Reissue with a recovery code
                 </button>
               </div>
             </div>
@@ -510,7 +510,7 @@ function TotpCard() {
       )}
       {recovery.length > 0 && (
         <div className="col" style={{ gap: 6 }}>
-          <span className="small muted">Новые коды восстановления — сохраните их, больше они не покажутся:</span>
+          <span className="small muted">New recovery codes — save them, they won't be shown again:</span>
           <div className="codes mono">
             {recovery.map((c) => (
               <span key={c}>{c}</span>
@@ -534,7 +534,7 @@ function TransferCard() {
     setNote("");
     try {
       const r = await exportVault(stepup);
-      if (r) setNote(`Сохранено: ${r.path} (${Math.max(1, Math.round(r.size / 1024))} КБ)`);
+      if (r) setNote(`Saved: ${r.path} (${Math.max(1, Math.round(r.size / 1024))} KB)`);
     } catch (e) {
       setError(errText(e));
     }
@@ -542,32 +542,32 @@ function TransferCard() {
 
   return (
     <div className="card pad col" style={{ gap: 14 }}>
-      <h2>Перенос хранилища</h2>
+      <h2>Move vault</h2>
       <p className="muted small">
-        Файл <span className="mono">.mcpkey</span> — всё хранилище целиком: ключи, клиенты агентов, настройки, журнал и
-        аутентификатор. Он зашифрован и открывается только мастер-паролем, который действует на момент экспорта. Подходит для
-        переезда на другой компьютер и как резервная копия.
+        A <span className="mono">.mcpkey</span> file is the whole vault: keys, agent clients, settings, the log and the
+        authenticator. It is encrypted and opens only with the master password that was in effect at export time. Use it to
+        move to another computer or as a backup.
       </p>
       <div className="row wrap">
-        <LockedButton onClick={doExport}>Экспортировать в .mcpkey</LockedButton>
+        <LockedButton onClick={doExport}>Export to .mcpkey</LockedButton>
         <button className="btn" onClick={() => setImporting((v) => !v)} aria-expanded={importing}>
-          Загрузить из .mcpkey…
+          Load from .mcpkey…
         </button>
       </div>
       {note && <Done text={note} />}
       {importing && (
         <div className="sub-panel col" style={{ gap: 12 }}>
           <span className="small">
-            <b>Текущее хранилище будет заменено</b> содержимым файла. Его копия останется рядом, в файле{" "}
-            <span className="mono">vault.db.before-import-…</span>, так что ничего не потеряется. После загрузки действуют
-            мастер-пароль, слово и аутентификатор из файла. Загрузка спросит пароль и код текущего хранилища, затем мастер-пароль
-            файла.
+            <b>The current vault will be replaced</b> with the file's contents. A copy of it stays alongside, in{" "}
+            <span className="mono">vault.db.before-import-…</span>, so nothing is lost. After loading, the master password, word and
+            authenticator from the file apply. Loading asks for the current vault's password and code, then the file's master
+            password.
           </span>
           <VaultFileImport
             run={stepup}
             onDone={(backup) => {
               setImporting(false);
-              setNote(backup ? `Хранилище загружено. Прежнее сохранено: ${backup}` : "Хранилище загружено");
+              setNote(backup ? `Vault loaded. The previous one is saved at: ${backup}` : "Vault loaded");
             }}
           />
         </div>
@@ -589,7 +589,7 @@ function ServiceCard({ status }: { status: AppStatus }) {
     try {
       await (install ? api.installService() : api.uninstallService());
       // On success the app restarts itself in the new mode; reaching here means nothing changed.
-      setNote(install ? "Готово — MCP Keyholder перезапускается." : "Готово — MCP Keyholder перезапускается.");
+      setNote(install ? "Done — MCP Keyholder is restarting." : "Done — MCP Keyholder is restarting.");
     } catch (e) {
       setError(errText(e));
     } finally {
@@ -599,25 +599,25 @@ function ServiceCard({ status }: { status: AppStatus }) {
 
   return (
     <div className="card pad col" style={{ gap: 12 }}>
-      <h2>Режим службы</h2>
+      <h2>Service mode</h2>
       <p className="muted small">
-        В режиме службы ядро работает под отдельной учётной записью <span className="mono">NT SERVICE\KeyHolder</span> и держит базу в{" "}
-        <span className="mono">%ProgramData%\KeyHolder</span>. Процессы вашего пользователя не могут прочитать память ядра, базу или
-        подменить бинарники службы. Нужны права администратора один раз; приложение после этого запускается вместе с Windows,
-        чтобы показывать окна подтверждения.
+        In service mode the core runs under a separate account, <span className="mono">NT SERVICE\KeyHolder</span>, and keeps the database in{" "}
+        <span className="mono">%ProgramData%\KeyHolder</span>. Processes running as your user can't read the core's memory or the database, or
+        replace the service binaries. Administrator rights are needed once; after that the app starts with Windows
+        to show approval windows.
       </p>
       {status.runtime === "service" ? (
         <>
           <p className="small">
-            Сейчас: <span className="pill otp">служба</span> · данные в {status.dataDir}
+            Now: <span className="pill otp">service</span> · data in {status.dataDir}
           </p>
           <button className="btn" disabled={busy} onClick={() => run(false)}>
-            Выключить режим службы
+            Turn off service mode
           </button>
         </>
       ) : (
         <button className="btn primary" disabled={busy} onClick={() => run(true)}>
-          Включить режим службы
+          Turn on service mode
         </button>
       )}
       {note && <span className="muted small">{note}</span>}
@@ -640,7 +640,7 @@ function PinCard({ hasPin }: { hasPin: boolean }) {
     try {
       const r = await stepup(() => api.setPin(pin).then(() => true));
       if (r) {
-        setNote(hasPin ? "PIN изменён" : "PIN задан");
+        setNote(hasPin ? "PIN changed" : "PIN set");
         setPin("");
         setPin2("");
       }
@@ -651,26 +651,26 @@ function PinCard({ hasPin }: { hasPin: boolean }) {
   const digits = (v: string) => v.replace(/\D/g, "").slice(0, 6);
   return (
     <div className="card pad col" style={{ gap: 14 }}>
-      <h2>PIN-код</h2>
+      <h2>PIN</h2>
       <p className="muted small">
-        Постоянный код из 4–6 цифр для ключей уровня «PIN». Знаете его только вы.{" "}
-        {hasPin ? "PIN задан." : "PIN ещё не задан: пока ключи уровня «PIN» подтверждаются кодом из аутентификатора."}
+        A fixed 4–6 digit code for keys at the “PIN” level. Only you know it.{" "}
+        {hasPin ? "PIN is set." : "No PIN set yet: until you set one, “PIN” keys are approved with an authenticator code."}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 200px))", gap: 12 }}>
         <label className="field">
-          {hasPin ? "Новый PIN" : "PIN"}
+          {hasPin ? "New PIN" : "PIN"}
           <input className="input mono" type="password" inputMode="numeric" value={pin} onChange={(e) => (setPin(digits(e.target.value)), setNote(""))} />
-          <span className={`hint ${pin && pin.length < 4 ? "bad" : ""}`}>4–6 цифр</span>
+          <span className={`hint ${pin && pin.length < 4 ? "bad" : ""}`}>4–6 digits</span>
         </label>
         <label className="field">
-          Ещё раз
+          Repeat PIN
           <input className="input mono" type="password" inputMode="numeric" value={pin2} onChange={(e) => (setPin2(digits(e.target.value)), setNote(""))} />
-          {mismatch && <span className="hint bad">Не совпадает</span>}
+          {mismatch && <span className="hint bad">Doesn't match</span>}
         </label>
       </div>
       <div className="row wrap">
         <LockedButton disabled={!ready} onClick={save}>
-          {hasPin ? "Сменить PIN" : "Задать PIN"}
+          {hasPin ? "Change PIN" : "Set PIN"}
         </LockedButton>
         <Done text={note} />
       </div>

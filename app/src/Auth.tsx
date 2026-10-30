@@ -10,7 +10,7 @@ function Brand() {
       <img className="logo-img" src={logoUrl} alt="" style={{ width: 46, height: 46 }} />
       <div className="col" style={{ gap: 0 }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>MCP Keyholder</span>
-        <span className="muted small">ключи для агентов под замком</span>
+        <span className="muted small">keys for agents, under lock</span>
       </div>
     </div>
   );
@@ -56,16 +56,16 @@ export function Unlock({ onDone, otpLockedUntil }: { onDone: () => void; otpLock
       <div className="auth-card">
         <Brand />
         <div className="col" style={{ gap: 4 }}>
-          <h1 style={{ fontSize: 21 }}>Хранилище заблокировано</h1>
+          <h1 style={{ fontSize: 21 }}>Vault locked</h1>
           <p className="muted">
             {manual
-              ? "Введите мастер-пароль. Пока хранилище закрыто, агенты не получают ничего."
-              : "Мастер-пароль вводится на отдельном рабочем столе Windows: ни агент, ни это окно его не видят."}
+              ? "Enter your master password. While the vault is locked, agents get nothing."
+              : "You type the master password on a separate Windows desktop: neither the agent nor this window can see it."}
           </p>
         </div>
         {manual ? (
           <label className="field">
-            Мастер-пароль
+            Master password
             <PasswordInput
               autoFocus
               autoComplete="current-password"
@@ -76,14 +76,14 @@ export function Unlock({ onDone, otpLockedUntil }: { onDone: () => void; otpLock
           </label>
         ) : (
           <button className="btn primary" disabled={busy} onClick={native}>
-            {busy ? "Открываю…" : "Разблокировать"}
+            {busy ? "Unlocking…" : "Unlock"}
           </button>
         )}
         {error && <p className="error">{error}</p>}
-        {otpLockedUntil && <p className="error">Ввод кодов временно закрыт после нескольких ошибок.</p>}
+        {otpLockedUntil && <p className="error">Code entry is temporarily blocked after several wrong attempts.</p>}
         {manual && (
           <button className="btn primary" disabled={busy || !password} onClick={submit}>
-            {busy ? "Открываю…" : "Разблокировать"}
+            {busy ? "Unlocking…" : "Unlock"}
           </button>
         )}
         <ResetVault onDone={onDone} />
@@ -101,9 +101,9 @@ function ResetVault({ onDone }: { onDone: () => void }) {
   if (!open) {
     return (
       <p className="muted small">
-        Забыли мастер-пароль? Восстановить его нельзя — так задумано.{" "}
+        Forgot your master password? It can't be recovered — by design.{" "}
         <button className="link" onClick={() => setOpen(true)}>
-          Сбросить хранилище
+          Reset vault
         </button>
       </p>
     );
@@ -122,22 +122,22 @@ function ResetVault({ onDone }: { onDone: () => void }) {
   };
   return (
     <div className="banner leak col" style={{ alignItems: "stretch", gap: 10 }}>
-      <span style={{ fontWeight: 600 }}>Сброс хранилища</span>
+      <span style={{ fontWeight: 600 }}>Reset vault</span>
       <span className="small" style={{ color: "var(--ink-2)" }}>
-        Все ключи, клиенты и журнал станут недоступны: будет создано новое пустое хранилище, а агентам понадобятся новые токены.
-        Старый файл не удаляется — он остаётся рядом в зашифрованном виде и откроется прежним паролем, если вы его вспомните.
+        All keys, clients and the log will become unavailable: a new empty vault is created, and agents will need new tokens.
+        The old file is not deleted — it stays next to the new one, encrypted, and opens with the old password if you remember it.
       </span>
       <label className="field">
-        Введите СБРОСИТЬ
+        Type RESET
         <input className="input" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
       </label>
       {error && <p className="error">{error}</p>}
       <div className="row">
-        <button className="btn danger" disabled={busy || confirm.trim() !== "СБРОСИТЬ"} onClick={reset}>
-          {busy ? "Сбрасываю…" : "Сбросить и начать заново"}
+        <button className="btn danger" disabled={busy || confirm.trim() !== "RESET"} onClick={reset}>
+          {busy ? "Resetting…" : "Reset and start over"}
         </button>
         <button className="btn" onClick={() => (setOpen(false), setConfirm(""), setError(""))}>
-          Отмена
+          Cancel
         </button>
       </div>
     </div>
@@ -181,24 +181,24 @@ export function Login({ mode, onDone }: { mode: LoginMode; onDone: () => void })
 
   const hint =
     mode === "nothing"
-      ? "Вход без пароля: служба хранит ключи за вас. Нажмите «Войти»."
+      ? "Sign-in without a password: the service keeps the keys for you. Click “Sign in”."
       : mode === "pin"
-        ? "Введите PIN — его спрашивают на отдельном рабочем столе Windows."
+        ? "Enter your PIN — it is asked for on a separate Windows desktop."
         : mode === "otp"
-          ? "Код из приложения-аутентификатора вводится на отдельном рабочем столе Windows."
-          : "Введите мастер-пароль.";
+          ? "You type the authenticator code on a separate Windows desktop."
+          : "Enter your master password.";
 
   return (
     <div className="center-screen">
       <div className="auth-card">
         <Brand />
         <div className="col" style={{ gap: 4 }}>
-          <h1 style={{ fontSize: 21 }}>Вход в MCP Keyholder</h1>
+          <h1 style={{ fontSize: 21 }}>Sign in to MCP Keyholder</h1>
           <p className="muted">{hint}</p>
         </div>
         {manual ? (
           <label className="field">
-            {mode === "pin" ? "PIN-код" : mode === "otp" ? "Код из приложения" : "Мастер-пароль"}
+            {mode === "pin" ? "PIN" : mode === "otp" ? "Authenticator code" : "Master password"}
             {mode === "otp" || mode === "pin" ? (
               <input
                 className="input mono"
@@ -226,11 +226,11 @@ export function Login({ mode, onDone }: { mode: LoginMode; onDone: () => void })
         {error && <p className="error">{error}</p>}
         {manual ? (
           <button className="btn primary" disabled={busy || (mode !== "nothing" && !credential)} onClick={submit}>
-            {busy ? "Вхожу…" : "Войти"}
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         ) : (
           <button className="btn primary" disabled={busy} onClick={native}>
-            {busy ? "Вхожу…" : "Войти"}
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         )}
       </div>
@@ -253,9 +253,9 @@ export function Setup({ onDone }: { onDone: () => void }) {
 
   const begin = async () => {
     setError("");
-    if (password.length < 10) return setError("Мастер-пароль — не короче 10 символов.");
-    if (password !== password2) return setError("Пароли не совпадают.");
-    if (word.trim().length < 3) return setError("Анти-фишинговое слово — от 3 символов.");
+    if (password.length < 10) return setError("The master password must be at least 10 characters.");
+    if (password !== password2) return setError("The passwords don't match.");
+    if (word.trim().length < 3) return setError("The anti-phishing word must be at least 3 characters.");
     setBusy(true);
     try {
       const r = await api.setupBegin(password, word);
@@ -278,7 +278,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
       setPassword2("");
       onDone();
     } catch (e) {
-      setError(errText(e) === "неверный код" ? "Код не подошёл. Подождите следующий код в приложении и попробуйте снова." : errText(e));
+      setError(errText(e) === "wrong code" ? "That code didn't work. Wait for the next code in the app and try again." : errText(e));
     } finally {
       setBusy(false);
     }
@@ -291,57 +291,57 @@ export function Setup({ onDone }: { onDone: () => void }) {
         {step === 1 && (
           <>
             <div className="col" style={{ gap: 4 }}>
-              <h1 style={{ fontSize: 21 }}>Новое хранилище</h1>
+              <h1 style={{ fontSize: 21 }}>New vault</h1>
               <p className="muted">
-                Мастер-пароль шифрует все ключи. Он нигде не хранится, и восстановить его нельзя.
+                The master password encrypts all keys. It isn't stored anywhere and can't be recovered.
               </p>
             </div>
             <label className="field">
-              Мастер-пароль (от 10 символов)
+              Master password (at least 10 characters)
               <PasswordInput autoFocus autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
             <label className="field">
-              Ещё раз
+              Repeat password
               <PasswordInput autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
             </label>
             <label className="field">
-              Анти-фишинговое слово
-              <input className="input" value={word} maxLength={32} onChange={(e) => setWord(e.target.value)} placeholder="например: сова" />
-              <span className="hint">Оно будет в каждом настоящем окне подтверждения MCP Keyholder. Нет слова — не вводите код.</span>
+              Anti-phishing word
+              <input className="input" value={word} maxLength={32} onChange={(e) => setWord(e.target.value)} placeholder="e.g. owl" />
+              <span className="hint">It appears in every genuine MCP Keyholder approval window. No word — don't enter your code.</span>
             </label>
             {error && <p className="error">{error}</p>}
             <button className="btn primary" disabled={busy} onClick={begin}>
-              {busy ? "Готовлю…" : "Дальше"}
+              {busy ? "Preparing…" : "Next"}
             </button>
             <div className="col" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-              <span className="small muted">Переезжаете с другого компьютера?</span>
-              <VaultFileImport label="Перенести хранилище из файла .mcpkey" onDone={() => onDone()} />
+              <span className="small muted">Moving from another computer?</span>
+              <VaultFileImport label="Move a vault from a .mcpkey file" onDone={() => onDone()} />
             </div>
           </>
         )}
         {step === 2 && (
           <>
             <div className="col" style={{ gap: 4 }}>
-              <h1 style={{ fontSize: 21 }}>Подключите приложение-аутентификатор</h1>
+              <h1 style={{ fontSize: 21 }}>Connect an authenticator app</h1>
               <p className="muted">
-                Отсканируйте QR в Google Authenticator, Aegis, 1Password или любом приложении с TOTP. Коды из него подтверждают
-                выдачу важных ключей — агент их не знает.
+                Scan the QR code with Google Authenticator, Aegis, 1Password or any TOTP app. Its codes approve access to
+                important keys — the agent doesn't know them.
               </p>
             </div>
-            <img className="qr" alt="QR-код для приложения-аутентификатора" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />
+            <img className="qr" alt="QR code for the authenticator app" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />
             {secretText ? (
               <p className="mono small" style={{ textAlign: "center", wordBreak: "break-all" }}>
                 {secretText}
               </p>
             ) : (
               <button className="link" style={{ alignSelf: "center" }} onClick={async () => setSecretText(await api.setupSecretText())}>
-                Не сканируется? Показать секрет текстом
+                Won't scan? Show the secret as text
               </button>
             )}
             <div className="col" style={{ gap: 6 }}>
-              <h2>Коды восстановления</h2>
+              <h2>Recovery codes</h2>
               <p className="muted small">
-                Запишите или распечатайте. Каждый код одноразовый и нужен, если потеряете телефон. Больше они показаны не будут.
+                Write them down or print them. Each code works once and is needed if you lose your phone. They won't be shown again.
               </p>
               <div className="codes mono">
                 {recovery.map((c) => (
@@ -350,11 +350,11 @@ export function Setup({ onDone }: { onDone: () => void }) {
               </div>
               <label className="row small" style={{ fontWeight: 500 }}>
                 <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-                Я сохранил коды восстановления
+                I've saved the recovery codes
               </label>
             </div>
             <label className="field">
-              Код из приложения
+              Authenticator code
               <input
                 className="input otp-input mono"
                 inputMode="numeric"
@@ -367,7 +367,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
             </label>
             {error && <p className="error">{error}</p>}
             <button className="btn primary" disabled={busy || !saved || code.length < 6} onClick={finish}>
-              {busy ? "Создаю хранилище…" : "Создать хранилище"}
+              {busy ? "Creating vault…" : "Create vault"}
             </button>
           </>
         )}

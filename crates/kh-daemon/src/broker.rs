@@ -165,7 +165,7 @@ impl Broker {
         while let Some(mut p) = g.queue.pop_front() {
             if p.view.session == id {
                 for tx in p.waiters.drain(..) {
-                    let _ = tx.send(Outcome::Denied("сессия агента закрыта".into()));
+                    let _ = tx.send(Outcome::Denied("the agent session closed".into()));
                 }
             } else {
                 keep.push_back(p);
@@ -339,7 +339,7 @@ mod tests {
             client: "c".into(),
             claimed_client: String::new(),
             process: "kh.exe".into(),
-            reason: "тест".into(),
+            reason: "test".into(),
             keys: vec![GrantKey { id: key.into(), name: key.into(), mode: Mode::Reveal, tier: Tier::Soft }],
             removed: vec![],
             ttl_minutes: 15,
@@ -357,7 +357,7 @@ mod tests {
             client: "c".into(),
             process: "kh.exe".into(),
             keys: vec![GrantKey { id: "k".into(), name: "k".into(), mode: Mode::Reveal, tier: Tier::Soft }],
-            reason: "тест".into(),
+            reason: "test".into(),
             level: Tier::Soft,
             created_at: 0,
             expires_at: now_ms() + 60_000,
@@ -372,16 +372,16 @@ mod tests {
         assert_eq!(b.enqueue(view("a", "k"), "sig".into(), tx1), Enqueue::New);
         let (tx2, rx2) = oneshot::channel();
         assert_eq!(b.enqueue(view("b", "k"), "sig".into(), tx2), Enqueue::Joined);
-        assert_eq!(b.queue_len(), 1, "второй одинаковый запрос не создаёт второй окно-запрос");
+        assert_eq!(b.queue_len(), 1, "a second identical request does not queue a second approval");
 
         b.resolve("a", Outcome::Granted(grant()));
         match rx1.blocking_recv() {
             Ok(Outcome::Granted(g)) => assert_eq!(g.id, "g1"),
-            _ => panic!("первый ждавший должен получить разрешение"),
+            _ => panic!("the first waiter must get the grant"),
         }
         match rx2.blocking_recv() {
             Ok(Outcome::Granted(g)) => assert_eq!(g.id, "g1"),
-            _ => panic!("присоединившийся ждавший должен получить то же разрешение"),
+            _ => panic!("the waiter that joined must get the same grant"),
         }
     }
 
@@ -406,7 +406,7 @@ mod tests {
         for rx in [rx1, rx2] {
             match rx.blocking_recv() {
                 Ok(Outcome::Denied(_)) => {}
-                _ => panic!("оба ждавших должны получить отказ"),
+                _ => panic!("both waiters must be denied"),
             }
         }
         assert_eq!(b.queue_len(), 0);

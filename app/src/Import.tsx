@@ -36,7 +36,7 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
 
   const pick = async () => {
     setError("");
-    const sel = await open({ multiple: true, directory: false, title: "Файлы с ключами" });
+    const sel = await open({ multiple: true, directory: false, title: "Files with keys" });
     if (!sel) return;
     const paths = Array.isArray(sel) ? sel : [sel];
     try {
@@ -131,11 +131,11 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
     <>
       <div className="head">
         <div className="col" style={{ gap: 4 }}>
-          <h1>Импорт из файлов</h1>
-          <p className="muted">Выберите старые .txt — MCP Keyholder найдёт в них ключи. Вы выбираете, что станет ключом; остальное вырезается.</p>
+          <h1>Import from files</h1>
+          <p className="muted">Pick old .txt files — MCP Keyholder finds the keys in them. You choose what becomes a key; the rest is cut out.</p>
         </div>
         <button className="btn primary" onClick={pick}>
-          {Icon.download(16)} Выбрать файлы
+          {Icon.download(16)} Choose files
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -143,8 +143,8 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
         <div className={`banner ${result.errors.length ? "warn" : "info"}`}>
           <div className="col" style={{ gap: 4 }}>
             <span style={{ fontWeight: 600 }}>
-              Перенесено: {result.added.length}
-              {result.deleted ? ` · удалено исходных файлов: ${result.deleted}` : ""}
+              Imported: {result.added.length}
+              {result.deleted ? ` · source files deleted: ${result.deleted}` : ""}
             </span>
             {result.errors.map((e) => (
               <span key={e} className="small error">
@@ -154,11 +154,11 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
           </div>
         </div>
       )}
-      {files.length === 0 && !result && <div className="card empty">Файлы не выбраны. Это дополнительная функция: обычно ключи добавляются вручную.</div>}
+      {files.length === 0 && !result && <div className="card empty">No files chosen. This is an extra feature: keys are usually added by hand.</div>}
 
       {files.length > 0 && (
         <div className="row" style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-          <div className="card" role="list" aria-label="Файлы" style={{ flex: "1 1 220px", maxWidth: 260, padding: 6 }}>
+          <div className="card" role="list" aria-label="Files" style={{ flex: "1 1 220px", maxWidth: 260, padding: 6 }}>
             {files.map((x, i) => {
               const n = drafts.filter((d) => d.file === i).length;
               return (
@@ -172,7 +172,7 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
                   <span className="grow ellipsis" style={{ fontWeight: 500 }}>
                     {x.fileName}
                   </span>
-                  <span className={`pill ${x.error ? "danger" : n ? "accent" : "warn"}`}>{x.error ? "ошибка" : n ? n : "разобрать"}</span>
+                  <span className={`pill ${x.error ? "danger" : n ? "accent" : "warn"}`}>{x.error ? "error" : n ? n : "review"}</span>
                 </button>
               );
             })}
@@ -184,7 +184,7 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
                 <span className="grow" style={{ fontWeight: 600 }}>
                   {f.fileName}
                 </span>
-                <span className="small muted">Нажмите на фрагмент, чтобы сделать его ключом</span>
+                <span className="small muted">Click a fragment to make it a key</span>
               </div>
               {f.error ? (
                 <p className="error">{f.error}</p>
@@ -210,12 +210,12 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
               )}
               <div className="row wrap small muted">
                 <span className="row" style={{ gap: 6 }}>
-                  <mark className="on" style={{ width: 12, height: 12, borderRadius: 3, outline: "1.5px solid var(--accent)", background: "var(--accent-soft)" }} /> станет ключом
+                  <mark className="on" style={{ width: 12, height: 12, borderRadius: 3, outline: "1.5px solid var(--accent)", background: "var(--accent-soft)" }} /> becomes a key
                 </span>
-                <span>· серым — будет вырезано</span>
+                <span>· grey — will be cut out</span>
                 {!f.error && (
                   <button className="link" onClick={() => toggle(cur, -1)}>
-                    {drafts.some((d) => d.file === cur && d.cand === -1) ? "Убрать «весь файл»" : "Взять весь файл целиком"}
+                    {drafts.some((d) => d.file === cur && d.cand === -1) ? "Remove “whole file”" : "Take the whole file"}
                   </button>
                 )}
               </div>
@@ -224,35 +224,35 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
 
           <div className="col" style={{ flex: "1.4 1 300px", minWidth: 0 }}>
             <span className="small muted" style={{ fontWeight: 600 }}>
-              Черновики из этого файла
+              Drafts from this file
             </span>
             {drafts.map((d, i) =>
               d.file !== cur ? null : (
                 <div key={`${d.file}:${d.cand}`} className="card pad col" style={{ gap: 8 }}>
                   <label className="field">
-                    Имя
+                    Name
                     <input className="input mono" value={d.name} onChange={(e) => upd(i, { name: e.target.value.toLowerCase() })} />
                   </label>
                   <label className="field">
-                    Описание
+                    Description
                     <input
                       className="input"
                       value={d.description}
-                      placeholder="Добавьте описание — его увидит агент"
+                      placeholder="Add a description — the agent will see it"
                       style={!d.description.trim() ? { borderColor: "var(--warn-line)", background: "var(--warn-surface)" } : undefined}
                       onChange={(e) => upd(i, { description: e.target.value })}
                     />
                   </label>
                   <div className="row">
-                    <input className="input mono" aria-label="Группа" value={d.group} onChange={(e) => upd(i, { group: e.target.value.toLowerCase() })} />
-                    <select className="select" aria-label="Подтверждение" value={d.tier} onChange={(e) => upd(i, { tier: e.target.value as Tier })}>
+                    <input className="input mono" aria-label="Group" value={d.group} onChange={(e) => upd(i, { group: e.target.value.toLowerCase() })} />
+                    <select className="select" aria-label="Approval level" value={d.tier} onChange={(e) => upd(i, { tier: e.target.value as Tier })}>
                       {(["auto", "soft", "pin", "otp", "sealed"] as Tier[]).map((t) => (
                         <option key={t} value={t}>
                           {TIER_LABEL[t]}
                         </option>
                       ))}
                     </select>
-                    <select className="select" aria-label="Режим" value={d.mode} onChange={(e) => upd(i, { mode: e.target.value as Mode })}>
+                    <select className="select" aria-label="Delivery mode" value={d.mode} onChange={(e) => upd(i, { mode: e.target.value as Mode })}>
                       <option value="reveal">reveal</option>
                       <option value="env">env</option>
                     </select>
@@ -260,18 +260,18 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
                 </div>
               ),
             )}
-            {!drafts.some((d) => d.file === cur) && <p className="muted small">Ничего не выбрано.</p>}
+            {!drafts.some((d) => d.file === cur) && <p className="muted small">Nothing selected.</p>}
           </div>
         </div>
       )}
 
       {drafts.length > 0 && (
         <div className="card row wrap" style={{ padding: "12px 12px 12px 18px", gap: 12 }}>
-          <span style={{ fontWeight: 600 }}>{drafts.length} черновиков</span>
-          {noDesc > 0 && <span className="pill warn">{noDesc} без описания</span>}
-          <span className="small muted">Всем:</span>
-          <select className="select" style={{ width: "auto" }} aria-label="Подтверждение для всех" value="" onChange={(e) => e.target.value && setAll({ tier: e.target.value as Tier })}>
-            <option value="">подтверждение…</option>
+          <span style={{ fontWeight: 600 }}>{drafts.length} {drafts.length === 1 ? "draft" : "drafts"}</span>
+          {noDesc > 0 && <span className="pill warn">{noDesc} without description</span>}
+          <span className="small muted">For all:</span>
+          <select className="select" style={{ width: "auto" }} aria-label="Approval level for all" value="" onChange={(e) => e.target.value && setAll({ tier: e.target.value as Tier })}>
+            <option value="">approval…</option>
             {(["auto", "soft", "pin", "otp", "sealed"] as Tier[]).map((t) => (
               <option key={t} value={t}>
                 {TIER_LABEL[t]}
@@ -281,18 +281,18 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
           <input
             className="input mono"
             style={{ width: 140 }}
-            placeholder="группа…"
-            aria-label="Группа для всех"
+            placeholder="group…"
+            aria-label="Group for all"
             onKeyDown={(e) => {
               if (e.key === "Enter" && e.currentTarget.value.trim()) setAll({ group: e.currentTarget.value.trim().toLowerCase() });
             }}
           />
           <label className="row small" style={{ marginLeft: "auto" }}>
             <input type="checkbox" checked={del} onChange={(e) => setDel(e.target.checked)} />
-            Удалить исходные файлы после переноса
+            Delete the source files after import
           </label>
           <button className="btn primary" disabled={busy} onClick={commit}>
-            {busy ? "Переношу…" : "Перенести в хранилище"}
+            {busy ? "Importing…" : "Import into vault"}
           </button>
         </div>
       )}

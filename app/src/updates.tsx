@@ -57,9 +57,9 @@ function UpdateAction({ update, service }: { update: Update; service: boolean })
   return (
     <>
       <button className="btn primary sm" disabled={busy} onClick={go}>
-        {busy ? (pct === null ? "Загружаю…" : `Загружаю… ${pct}%`) : "Обновить и перезапустить"}
+        {busy ? (pct === null ? "Downloading…" : `Downloading… ${pct}%`) : "Update and restart"}
       </button>
-      {service && <span className="small muted">Службу после обновления переустановите: «Настройки» → «Режим службы».</span>}
+      {service && <span className="small muted">After updating, reinstall the service: Settings → Service mode.</span>}
       {error && <span className="error">{error}</span>}
     </>
   );
@@ -86,7 +86,7 @@ export function UpdateBanner({ service }: { service: boolean }) {
   return (
     <div className="banner info" role="status">
       <span className="grow small">
-        <b>Доступна версия {update.version}</b> · что нового — в CHANGELOG на странице релиза
+        <b>Version {update.version} is available</b> · what's new is in the CHANGELOG on the release page
       </span>
       <UpdateAction update={update} service={service} />
     </div>
@@ -106,9 +106,9 @@ export function UpdateSettings({ version, service }: { version: string; service:
     try {
       const u = await check();
       if (u) setUpdate(u);
-      else setState(`Установлена последняя версия (${version})`);
+      else setState(`You have the latest version (${version})`);
     } catch (e) {
-      setState(`Не удалось проверить: ${errText(e)}`);
+      setState(`Couldn't check: ${errText(e)}`);
     } finally {
       setBusy(false);
     }
@@ -124,16 +124,16 @@ export function UpdateSettings({ version, service }: { version: string; service:
             setAutoUpdate(e.target.checked);
           }}
         />
-        Проверять обновления автоматически (раз в 6 часов, без интернета — молча пропускается)
+        Check for updates automatically (every 6 hours; skipped silently when offline)
       </label>
       <div className="row wrap">
         <button className="btn sm" disabled={busy} onClick={checkNow}>
-          {busy ? "Проверяю…" : "Проверить обновления"}
+          {busy ? "Checking…" : "Check for updates"}
         </button>
         {update ? (
           <>
             <span className="small">
-              <b>Доступна версия {update.version}</b>
+              <b>Version {update.version} is available</b>
             </span>
             <UpdateAction update={update} service={service} />
           </>

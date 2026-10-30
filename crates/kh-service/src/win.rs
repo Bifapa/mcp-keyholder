@@ -25,7 +25,7 @@ use windows_sys::Win32::System::EventLog::{DeregisterEventSource, RegisterEventS
 
 pub const SERVICE_NAME: &str = "KeyHolder";
 pub const SERVICE_DISPLAY: &str = "MCP Keyholder";
-pub const SERVICE_DESC: &str = "Хранилище ключей для агентов: ядро под отдельной учётной записью";
+pub const SERVICE_DESC: &str = "Key vault for AI agents: the core runs under a separate account";
 pub const SERVICE_ACCOUNT: &str = "NT SERVICE\\KeyHolder";
 pub const SERVICE_EXE: &str = "keyholder-service.exe";
 
@@ -57,7 +57,7 @@ fn wide(s: &str) -> Vec<u16> {
 }
 
 fn current_sid() -> Result<String> {
-    kh_core::ipc::current_user_sid().map_err(|e| anyhow!("не удалось определить SID пользователя: {e}"))
+    kh_core::ipc::current_user_sid().map_err(|e| anyhow!("could not determine the user SID: {e}"))
 }
 
 fn is_admin() -> bool {
@@ -81,12 +81,12 @@ fn is_admin() -> bool {
 /// install, uninstall and back up). Ordinary user processes get nothing.
 pub fn lock_down(path: &Path) -> Result<()> {
     let sid = kh_core::ipc::service_account_sid(SERVICE_ACCOUNT)
-        .map_err(|e| anyhow!("не удалось определить SID службы: {e}"))?;
+        .map_err(|e| anyhow!("could not determine the service SID: {e}"))?;
     let sddl = format!("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{sid})");
     apply_sddl(path, &sddl)?;
     // Files that already existed keep their old ACL: reapply to each of them.
     if path.is_dir() {
-        for entry in std::fs::read_dir(path).with_context(|| format!("чтение {}", path.display()))? {
+        for entry in std::fs::read_dir(path).with_context(|| format!("reading {}", path.display()))? {
             let p = entry?.path();
             apply_sddl(&p, &sddl)?;
             if p.is_dir() {
@@ -100,7 +100,7 @@ pub fn lock_down(path: &Path) -> Result<()> {
 /// Gives the owner read access to one file (used for service.json, which the app reads).
 pub fn allow_owner_read(path: &Path, owner_sid: &str) -> Result<()> {
     let sid = kh_core::ipc::service_account_sid(SERVICE_ACCOUNT)
-        .map_err(|e| anyhow!("не удалось определить SID службы: {e}"))?;
+        .map_err(|e| anyhow!("could not determine the service SID: {e}"))?;
     let sddl = format!("D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{sid})(A;;FR;;;{owner_sid})");
     apply_sddl(path, &sddl)
 }
@@ -110,7 +110,7 @@ fn apply_sddl(path: &Path, sddl: &str) -> Result<()> {
         let mut sd: PSECURITY_DESCRIPTOR = null_mut();
         let s = wide(sddl);
         if ConvertStringSecurityDescriptorToSecurityDescriptorW(s.as_ptr(), SDDL_REVISION_1, &mut sd, null_mut()) == 0 {
-            bail!("не удалось разобрать дескриптор безопасности");
+            bail!("could not parse the security descriptor");
         }
         let mut owner: PSECURITY_DESCRIPTOR = null_mut();
         let mut owner_defaulted = 0i32;
@@ -137,7 +137,7 @@ fn apply_sddl(path: &Path, sddl: &str) -> Result<()> {
         );
         LocalFree(sd as *mut c_void);
         if rc != 0 {
-            bail!("не удалось выставить права на {} (код {rc})", path.display());
+            bail!("could not set permissions on {} (code {rc})", path.display());
         }
     }
     Ok(())
@@ -147,7 +147,7 @@ fn apply_sddl(path: &Path, sddl: &str) -> Result<()> {
 
 fn manager() -> Result<ServiceManager> {
     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-        .map_err(|e| anyhow!("нет доступа к диспетчеру служб: {e}"))
+        .map_err(|e| anyhow!("no access to the service control manager: {e}"))
 }
 
 pub fn status() -> Result<()> {
@@ -155,21 +155,21 @@ pub fn status() -> Result<()> {
     match m.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS) {
         Ok(s) => {
             let st = s.query_status().map_err(|e| anyhow!("{e}"))?;
-            println!("Служба {SERVICE_NAME}: {:?}", st.current_state);
+            println!("Service {SERVICE_NAME}: {:?}", st.current_state);
             if let Some(cfg) = read_config()? {
-                println!("Данные: {}", cfg.data_dir);
-                println!("Бинарники: {}", cfg.install_dir);
-                println!("Пользователь канала: {}", cfg.owner_sid);
+                println!("Data: {}", cfg.data_dir);
+                println!("Binaries: {}", cfg.install_dir);
+                println!("Channel owner: {}", cfg.owner_sid);
             }
         }
-        Err(_) => println!("Служба {SERVICE_NAME} не установлена"),
+        Err(_) => println!("Service {SERVICE_NAME} is not installed"),
     }
     Ok(())
 }
 
 fn read_config() -> Result<Option<ServiceConfig>> {
     match std::fs::read(config_path()) {
-        Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes).context("service.json повреждён")?)),
+        Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes).context("service.json is corrupted")?)),
         Err(_) => Ok(None),
     }
 }
@@ -177,7 +177,7 @@ fn read_config() -> Result<Option<ServiceConfig>> {
 /// Runs the SCM dispatcher; the process becomes the service for as long as it lives.
 pub fn dispatch() -> Result<()> {
     windows_service::service_dispatcher::start(SERVICE_NAME, ffi_service_main)
-        .map_err(|e| anyhow!("служба не запустилась: {e}"))
+        .map_err(|e| anyhow!("the service failed to start: {e}"))
 }
 
 windows_service::define_windows_service!(ffi_service_main, service_main);
@@ -205,7 +205,7 @@ fn run_as_service() -> Result<()> {
             _ => ServiceControlHandlerResult::NotImplemented,
         }
     })
-    .map_err(|e| anyhow!("регистрация обработчика службы: {e}"))?;
+    .map_err(|e| anyhow!("registering the service control handler: {e}"))?;
 
     let starting = ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
@@ -218,7 +218,7 @@ fn run_as_service() -> Result<()> {
     };
     status_handle.set_service_status(starting).ok();
 
-    let cfg = read_config()?.ok_or_else(|| anyhow!("нет {}", config_path().display()))?;
+    let cfg = read_config()?.ok_or_else(|| anyhow!("missing {}", config_path().display()))?;
     let install_dir = PathBuf::from(&cfg.install_dir);
     let kh_path = install_dir.join("kh.exe").to_string_lossy().to_string();
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
@@ -270,12 +270,12 @@ fn report_error(message: &str) {
 
 pub fn install(source: Option<PathBuf>, owner: Option<String>, app: Option<String>) -> Result<()> {
     if !is_admin() {
-        bail!("установка службы требует прав администратора");
+        bail!("installing the service requires administrator rights");
     }
     {
         let m = manager()?;
         if m.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS).is_ok() {
-            bail!("служба MCP Keyholder уже установлена — сначала удалите её");
+            bail!("the MCP Keyholder service is already installed: uninstall it first");
         }
     }
     let owner_sid = match owner {
@@ -283,28 +283,28 @@ pub fn install(source: Option<PathBuf>, owner: Option<String>, app: Option<Strin
         None => current_sid()?,
     };
     if owner_sid.is_empty() {
-        bail!("не удалось определить SID пользователя: запустите через приложение MCP Keyholder");
+        bail!("could not determine the user SID: run this from the MCP Keyholder app");
     }
 
     let data_dir = program_data_dir();
     let install_dir = program_files_dir();
-    std::fs::create_dir_all(&data_dir).with_context(|| format!("создание {}", data_dir.display()))?;
-    std::fs::create_dir_all(&install_dir).with_context(|| format!("создание {}", install_dir.display()))?;
+    std::fs::create_dir_all(&data_dir).with_context(|| format!("creating {}", data_dir.display()))?;
+    std::fs::create_dir_all(&install_dir).with_context(|| format!("creating {}", install_dir.display()))?;
 
     // 1. The vault moves in before the folder is locked down.
     if let Some(src) = source {
         let dst = data_dir.join("vault.db");
         if src.exists() && !dst.exists() {
-            std::fs::copy(&src, &dst).with_context(|| format!("перенос {}", src.display()))?;
+            std::fs::copy(&src, &dst).with_context(|| format!("moving {}", src.display()))?;
             for suffix in ["-wal", "-shm"] {
                 let from = PathBuf::from(format!("{}{suffix}", src.display()));
                 if from.exists() {
                     let _ = std::fs::copy(&from, format!("{}{suffix}", dst.display()));
                 }
             }
-            println!("Хранилище перенесено в {}", dst.display());
+            println!("Vault moved to {}", dst.display());
         } else if dst.exists() {
-            println!("Хранилище уже есть в {} — оставляю как есть", dst.display());
+            println!("A vault already exists in {}; leaving it as is", dst.display());
         }
     }
 
@@ -312,13 +312,13 @@ pub fn install(source: Option<PathBuf>, owner: Option<String>, app: Option<Strin
     let me = std::env::current_exe()?;
     let svc_exe = install_dir.join(SERVICE_EXE);
     if me != svc_exe {
-        std::fs::copy(&me, &svc_exe).with_context(|| format!("копирование в {}", svc_exe.display()))?;
+        std::fs::copy(&me, &svc_exe).with_context(|| format!("copying to {}", svc_exe.display()))?;
     }
     let kh_src = me.with_file_name("kh.exe");
     if kh_src.exists() {
         std::fs::copy(&kh_src, install_dir.join("kh.exe"))?;
     } else {
-        println!("Внимание: kh.exe рядом не найден — агентам нечем подключаться");
+        println!("Warning: kh.exe was not found next to this program; agents will have no way to connect");
     }
 
     // 3. Lock the data folder to the service account and SYSTEM.
@@ -332,12 +332,12 @@ pub fn install(source: Option<PathBuf>, owner: Option<String>, app: Option<Strin
             app_path: app,
         })?,
     )
-    .with_context(|| "запись service.json".to_string())?;
+    .with_context(|| "writing service.json".to_string())?;
     allow_owner_read(&config_path(), &owner_sid)?;
 
     // 4. The service itself.
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE)
-        .map_err(|e| anyhow!("нет доступа к диспетчеру служб: {e}"))?;
+        .map_err(|e| anyhow!("no access to the service control manager: {e}"))?;
     let info = ServiceInfo {
         name: OsString::from(SERVICE_NAME),
         display_name: OsString::from(SERVICE_DISPLAY),
@@ -352,20 +352,20 @@ pub fn install(source: Option<PathBuf>, owner: Option<String>, app: Option<Strin
     };
     let service = manager
         .create_service(&info, ServiceAccess::START | ServiceAccess::QUERY_STATUS)
-        .map_err(|e| anyhow!("не удалось создать службу: {e}"))?;
+        .map_err(|e| anyhow!("could not create the service: {e}"))?;
     let _ = service.set_description(SERVICE_DESC);
-    service.start::<&OsStr>(&[]).map_err(|e| anyhow!("служба не запустилась: {e}"))?;
-    println!("Служба установлена и запущена. Данные: {}", data_dir.display());
-    println!("Бинарники: {}", install_dir.display());
+    service.start::<&OsStr>(&[]).map_err(|e| anyhow!("the service failed to start: {e}"))?;
+    println!("Service installed and started. Data: {}", data_dir.display());
+    println!("Binaries: {}", install_dir.display());
     Ok(())
 }
 
 pub fn uninstall(restore: Option<PathBuf>) -> Result<()> {
     if !is_admin() {
-        bail!("удаление службы требует прав администратора");
+        bail!("uninstalling the service requires administrator rights");
     }
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-        .map_err(|e| anyhow!("нет доступа к диспетчеру служб: {e}"))?;
+        .map_err(|e| anyhow!("no access to the service control manager: {e}"))?;
     let data_dir = program_data_dir();
 
     // 1. Stop the service so the vault file is closed.
@@ -378,7 +378,7 @@ pub fn uninstall(restore: Option<PathBuf>) -> Result<()> {
         loop {
             match service.query_status() {
                 Ok(s) if s.current_state == ServiceState::Stopped => break,
-                _ if Instant::now() > deadline => bail!("служба не остановилась за 20 секунд"),
+                _ if Instant::now() > deadline => bail!("the service did not stop within 20 seconds"),
                 _ => std::thread::sleep(Duration::from_millis(200)),
             }
         }
@@ -388,31 +388,31 @@ pub fn uninstall(restore: Option<PathBuf>) -> Result<()> {
     if let Some(dir) = &restore {
         let from = data_dir.join("vault.db");
         if from.exists() {
-            std::fs::create_dir_all(dir).with_context(|| format!("создание {}", dir.display()))?;
+            std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
             let to = dir.join("vault.db");
             if to.exists() {
-                bail!("в {} уже есть vault.db — переименуйте его и повторите", dir.display());
+                bail!("{} already contains vault.db: rename it and try again", dir.display());
             }
-            std::fs::copy(&from, &to).with_context(|| format!("возврат хранилища в {}", to.display()))?;
+            std::fs::copy(&from, &to).with_context(|| format!("restoring the vault to {}", to.display()))?;
             for suffix in ["-wal", "-shm"] {
                 let f = PathBuf::from(format!("{}{suffix}", from.display()));
                 if f.exists() {
-                    std::fs::copy(&f, format!("{}{suffix}", to.display())).with_context(|| "возврат журнала SQLite")?;
+                    std::fs::copy(&f, format!("{}{suffix}", to.display())).with_context(|| "restoring the SQLite journal")?;
                 }
             }
-            println!("Хранилище возвращено в {}", dir.display());
+            println!("Vault restored to {}", dir.display());
         }
     }
 
     // 3. Now the service and its files can go.
     if let Some(service) = service {
-        service.delete().map_err(|e| anyhow!("не удалось удалить службу: {e}"))?;
-        println!("Служба удалена");
+        service.delete().map_err(|e| anyhow!("could not delete the service: {e}"))?;
+        println!("Service removed");
     } else {
-        println!("Служба не была установлена");
+        println!("Service was not installed");
     }
     if data_dir.exists() {
-        std::fs::remove_dir_all(&data_dir).with_context(|| format!("удаление {}", data_dir.display()))?;
+        std::fs::remove_dir_all(&data_dir).with_context(|| format!("deleting {}", data_dir.display()))?;
     }
     let pf = program_files_dir();
     if pf.exists() {

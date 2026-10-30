@@ -161,15 +161,15 @@ mod tests {
             }),
             Some(tx),
         );
-        let hwnd = rx.recv_timeout(std::time::Duration::from_secs(5)).expect("окно сторожа создано");
-        assert_ne!(hwnd, 0, "окно сторожа должно существовать");
-        assert!(win::post_session_lock(hwnd), "сообщение о блокировке отправлено");
+        let hwnd = rx.recv_timeout(std::time::Duration::from_secs(5)).expect("watcher window created");
+        assert_ne!(hwnd, 0, "the watcher window must exist");
+        assert!(win::post_session_lock(hwnd), "lock message posted");
         for _ in 0..50 {
             if hits.load(Ordering::SeqCst) > 0 {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
-        assert_eq!(hits.load(Ordering::SeqCst), 1, "блокировка сеанса должна закрыть хранилище");
+        assert_eq!(hits.load(Ordering::SeqCst), 1, "a session lock must lock the vault");
     }
 }

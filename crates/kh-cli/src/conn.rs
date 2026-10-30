@@ -19,7 +19,7 @@ pub struct Conn {
     alive: Arc<std::sync::atomic::AtomicBool>,
 }
 
-pub const DISCONNECTED: &str = "соединение с MCP Keyholder потеряно";
+pub const DISCONNECTED: &str = "lost the connection to MCP Keyholder";
 
 #[cfg(windows)]
 async fn open_stream(autostart: bool) -> Result<tokio::net::windows::named_pipe::NamedPipeClient, String> {
@@ -38,7 +38,7 @@ async fn open_stream(autostart: bool) -> Result<tokio::net::windows::named_pipe:
                     start_app();
                 }
                 if tokio::time::Instant::now() > deadline {
-                    return Err("MCP Keyholder не запустился".into());
+                    return Err("MCP Keyholder did not start".into());
                 }
                 tokio::time::sleep(Duration::from_millis(300)).await;
             }
@@ -56,8 +56,8 @@ fn verify_server(c: &tokio::net::windows::named_pipe::NamedPipeClient) -> Result
         return Ok(());
     }
     let dir = std::env::current_exe().map_err(|e| e.to_string())?.with_file_name("");
-    let pid = kh_core::ipc::server_pid(c).ok_or("не удалось определить процесс MCP Keyholder")?;
-    let image = kh_core::ipc::process_image(pid).ok_or("не удалось определить путь процесса MCP Keyholder")?;
+    let pid = kh_core::ipc::server_pid(c).ok_or("could not identify the MCP Keyholder process")?;
+    let image = kh_core::ipc::process_image(pid).ok_or("could not find the path of the MCP Keyholder process")?;
     let norm = |s: &str| s.replace('/', "\\").to_lowercase();
     let image_n = norm(&image);
 
@@ -75,7 +75,7 @@ fn verify_server(c: &tokio::net::windows::named_pipe::NamedPipeClient) -> Result
     }
     let Some((_, is_service)) = expected.into_iter().find(|(p, _)| image_n == *p) else {
         return Err(format!(
-            "канал MCP Keyholder принадлежит чужому процессу ({image}), ожидался MCP Keyholder из {} — соединение отклонено",
+            "the MCP Keyholder pipe belongs to another process ({image}), expected MCP Keyholder from {} — connection refused",
             dir.display()
         ));
     };
@@ -85,7 +85,7 @@ fn verify_server(c: &tokio::net::windows::named_pipe::NamedPipeClient) -> Result
     if is_service {
         let me = kh_core::ipc::current_user_sid().unwrap_or_default();
         if kh_core::ipc::process_user_sid(pid).as_deref() != Some(me.as_str()) || me.is_empty() {
-            return Err("процесс keyholder-service.exe не является службой MCP Keyholder — соединение отклонено".into());
+            return Err("this keyholder-service.exe process is not the MCP Keyholder service — connection refused".into());
         }
     }
     Ok(())
@@ -166,12 +166,12 @@ impl Conn {
         let mut first = String::new();
         tokio::time::timeout(Duration::from_secs(10), rd.read_line(&mut first))
             .await
-            .map_err(|_| "MCP Keyholder не ответил".to_string())?
+            .map_err(|_| "MCP Keyholder did not reply".to_string())?
             .map_err(|e| e.to_string())?;
         match serde_json::from_str::<ServerMsg>(first.trim()) {
             Ok(ServerMsg::Welcome { .. }) => {}
             Ok(ServerMsg::Fatal { message }) => return Err(message),
-            _ => return Err("неожиданный ответ MCP Keyholder".into()),
+            _ => return Err("unexpected reply from MCP Keyholder".into()),
         }
 
         let (tx, mut rx) = mpsc::unbounded_channel::<String>();

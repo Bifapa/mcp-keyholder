@@ -42,7 +42,7 @@ pub fn copy_secret(text: &str) -> Result<(), String> {
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
         if !opened {
-            return Err("буфер обмена занят другой программой".into());
+            return Err("the clipboard is in use by another program".into());
         }
         EmptyClipboard();
         let mut w: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
@@ -62,7 +62,7 @@ pub fn copy_secret(text: &str) -> Result<(), String> {
         }
         CloseClipboard();
         if !ok {
-            return Err("не удалось записать в буфер обмена".into());
+            return Err("could not write to the clipboard".into());
         }
         let seq = GetClipboardSequenceNumber();
         std::thread::spawn(move || {
@@ -78,5 +78,5 @@ pub fn copy_secret(text: &str) -> Result<(), String> {
 
 #[cfg(not(windows))]
 pub fn copy_secret(_text: &str) -> Result<(), String> {
-    Err("копирование пока доступно только на Windows".into())
+    Err("copying is only available on Windows for now".into())
 }

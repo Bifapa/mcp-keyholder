@@ -99,7 +99,7 @@ pub fn candidates(text: &str) -> Vec<Candidate> {
     for m in tok.find_iter(text) {
         let s = m.as_str();
         if entropy_bits(s) / s.chars().count() as f64 >= 3.5 && !overlaps(&found, m.start(), m.end()) {
-            found.push((m.start(), m.end(), "похоже на ключ".into(), "entropy".into(), "key".into()));
+            found.push((m.start(), m.end(), "looks like a key".into(), "entropy".into(), "key".into()));
         }
     }
 
@@ -107,7 +107,7 @@ pub fn candidates(text: &str) -> Vec<Candidate> {
         let t = text.trim();
         if !t.is_empty() && !t.contains('\n') && t.chars().count() >= 8 {
             let start = text.find(t).unwrap_or(0);
-            found.push((start, start + t.len(), "весь файл".into(), "whole".into(), "key".into()));
+            found.push((start, start + t.len(), "whole file".into(), "whole".into(), "key".into()));
         }
     }
 

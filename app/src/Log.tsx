@@ -3,38 +3,38 @@ import { api, errText, timeOf, type ChainStatus, type LogEntry } from "./api";
 import { Icon } from "./ui";
 
 const ACTION: Record<string, string> = {
-  setup: "создание хранилища",
-  unlock: "разблокировка",
-  lock: "блокировка",
-  add_key: "ключ добавлен",
-  edit_key: "ключ изменён",
-  rotate_key: "значение заменено",
-  delete_key: "ключ удалён",
-  import: "импорт",
-  list_secrets: "список ключей",
-  request_grant: "запрос доступа",
-  grant: "разрешение выдано",
-  deny: "отказ человека",
-  revoke_grant: "разрешение отозвано",
-  access: "обращение",
-  get_secret: "выдача значения",
-  prepare_run: "билет kh run",
+  setup: "vault created",
+  unlock: "unlock",
+  lock: "lock",
+  add_key: "key added",
+  edit_key: "key edited",
+  rotate_key: "value replaced",
+  delete_key: "key deleted",
+  import: "import",
+  list_secrets: "key list",
+  request_grant: "access request",
+  grant: "grant issued",
+  deny: "denied by you",
+  revoke_grant: "grant revoked",
+  access: "access",
+  get_secret: "value given",
+  prepare_run: "kh run ticket",
   kh_run: "kh run",
-  report_leak: "сообщение об утечке",
-  leak_found: "утечка найдена",
-  exposed: "значение раскрыто",
-  check_leak: "проверка текста",
-  dismiss_leak: "отметка снята",
-  stepup: "повышение прав",
-  reveal_ui: "показ значения",
-  copy_ui: "копирование значения",
-  add_client: "клиент добавлен",
-  revoke_client: "клиент отозван",
-  block_client: "клиент заблокирован",
-  unblock_client: "клиент разблокирован",
-  otp: "код OTP",
-  otp_lockout: "ввод кодов закрыт",
-  settings: "настройки",
+  report_leak: "leak reported",
+  leak_found: "leak found",
+  exposed: "value exposed",
+  check_leak: "text check",
+  dismiss_leak: "leak mark cleared",
+  stepup: "step-up",
+  reveal_ui: "value shown",
+  copy_ui: "value copied",
+  add_client: "client added",
+  revoke_client: "client revoked",
+  block_client: "client blocked",
+  unblock_client: "client unblocked",
+  otp: "OTP code",
+  otp_lockout: "code entry blocked",
+  settings: "settings",
 };
 
 function outcomeClass(o: string) {
@@ -79,35 +79,35 @@ export function LogPage({ refreshKey }: { refreshKey: number }) {
     <>
       <div className="head">
         <div className="col" style={{ gap: 4 }}>
-          <h1>Журнал</h1>
-          <p className="muted">Кто, когда и зачем обращался к ключам. Каждая запись подписана и связана с предыдущей.</p>
+          <h1>Log</h1>
+          <p className="muted">Who used which keys, when and why. Each entry is signed and chained to the previous one.</p>
         </div>
         {chain && (
           <span className={`pill ${chain.ok ? "ok" : "danger"}`} style={{ padding: "6px 12px" }}>
-            {chain.ok ? Icon.check(14) : "!"} {chain.ok ? `Цепочка цела · ${chain.entries} записей` : `Журнал нарушен: ${chain.message} (запись ${chain.firstBadSeq})`}
+            {chain.ok ? Icon.check(14) : "!"} {chain.ok ? `Chain intact · ${chain.entries} ${chain.entries === 1 ? "entry" : "entries"}` : `Log broken: ${chain.message} (entry ${chain.firstBadSeq})`}
           </span>
         )}
       </div>
       <div className="row wrap">
         <label className="search">
           {Icon.search(16)}
-          <span className="sr-only">Фильтр</span>
-          <input type="search" placeholder="Фильтр: клиент, ключ, действие, результат" value={q} onChange={(e) => setQ(e.target.value)} />
+          <span className="sr-only">Filter</span>
+          <input type="search" placeholder="Filter: client, key, action, result" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <button className="btn outline" onClick={load}>
-          Обновить и проверить
+          Refresh and verify
         </button>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="card" style={{ overflowX: "auto" }}>
         <div style={{ minWidth: 860 }}>
           <div className="row small muted" style={{ display: "grid", gridTemplateColumns: "150px 130px minmax(160px,1fr) 170px 110px minmax(160px,1.2fr)", gap: 12, padding: "12px 16px", fontWeight: 600 }}>
-            <span>Время</span>
-            <span>Клиент</span>
-            <span>Ключ</span>
-            <span>Действие</span>
-            <span>Результат</span>
-            <span>Детали</span>
+            <span>Time</span>
+            <span>Client</span>
+            <span>Key</span>
+            <span>Action</span>
+            <span>Result</span>
+            <span>Details</span>
           </div>
           {shown.map((r) => (
             <div key={r.seq} style={{ display: "grid", gridTemplateColumns: "150px 130px minmax(160px,1fr) 170px 110px minmax(160px,1.2fr)", gap: 12, padding: "9px 16px", borderTop: "1px solid var(--line-soft)", alignItems: "center" }}>
@@ -127,12 +127,12 @@ export function LogPage({ refreshKey }: { refreshKey: number }) {
               </span>
             </div>
           ))}
-          {shown.length === 0 && <div className="empty">Записей нет</div>}
+          {shown.length === 0 && <div className="empty">No entries</div>}
         </div>
       </div>
       {more && !ql && (
         <button className="btn outline" style={{ alignSelf: "center" }} onClick={loadMore}>
-          Показать ещё
+          Show more
         </button>
       )}
     </>

@@ -36,19 +36,19 @@ impl Events for ChannelEvents {
 }
 
 pub async fn serve(s: Settings, shutdown: tokio::sync::oneshot::Receiver<()>) -> Result<()> {
-    std::fs::create_dir_all(&s.data_dir).with_context(|| format!("каталог данных {}", s.data_dir.display()))?;
-    let mut vault = Vault::open(&s.data_dir.join("vault.db")).context("открытие хранилища")?;
+    std::fs::create_dir_all(&s.data_dir).with_context(|| format!("data directory {}", s.data_dir.display()))?;
+    let mut vault = Vault::open(&s.data_dir.join("vault.db")).context("opening the vault")?;
 
     // Keys live under DPAPI for the service account, so the service starts without a human.
     let full_lock = vault.startup_full_lock();
     if vault.is_initialized() && !full_lock {
         match vault.unlock_dpapi() {
-            Ok(true) => eprintln!("MCP Keyholder: ключи восстановлены (DPAPI)"),
-            Ok(false) => eprintln!("MCP Keyholder: хранилище ждёт мастер-пароль"),
-            Err(e) => eprintln!("MCP Keyholder: ключи службы не открылись: {e}"),
+            Ok(true) => eprintln!("MCP Keyholder: keys restored (DPAPI)"),
+            Ok(false) => eprintln!("MCP Keyholder: the vault is waiting for the master password"),
+            Err(e) => eprintln!("MCP Keyholder: could not open the service keys: {e}"),
         }
     } else if full_lock {
-        eprintln!("MCP Keyholder: полная блокировка — нужен мастер-пароль");
+        eprintln!("MCP Keyholder: full lock, master password required");
     }
 
     let d = Daemon::new(vault, Runtime::Service, s.kh_path, s.data_dir.clone());
@@ -69,7 +69,7 @@ pub async fn serve(s: Settings, shutdown: tokio::sync::oneshot::Receiver<()>) ->
 
     // Run until the process is asked to stop.
     tokio::select! {
-        _ = shutdown => eprintln!("MCP Keyholder: остановка службы"),
+        _ = shutdown => eprintln!("MCP Keyholder: stopping the service"),
         _ = std::future::pending::<()>() => {}
     }
     Ok(())
