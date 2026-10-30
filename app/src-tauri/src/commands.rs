@@ -47,6 +47,8 @@ pub async fn status(app: AppHandle, window: WebviewWindow) -> Res<Value> {
     if let Value::Object(ref mut o) = v {
         o.insert("serviceInstalled".into(), json!(st.service_installed));
         o.insert("desktopAvailable".into(), json!(desktop::available()));
+        // "windows" or "macos": service mode and the separate desktop are Windows-only.
+        o.insert("platform".into(), json!(std::env::consts::OS));
         o.insert("portableAllowed".into(), json!(!st.service_installed));
     }
     Ok(v)

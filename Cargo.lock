@@ -2171,6 +2171,7 @@ dependencies = [
  "data-encoding",
  "hkdf",
  "hmac",
+ "libc",
  "rand",
  "regex",
  "rusqlite",

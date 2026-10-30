@@ -151,6 +151,7 @@ export function SettingsPage({ status }: { status: AppStatus }) {
             <input type="checkbox" checked={s.disableOnLeakReport} onChange={(e) => edit({ disableOnLeakReport: e.target.checked })} />
             Disable a key when an agent reports a leak
           </label>
+          {status.platform !== "macos" && (
           <label className="row small">
             <input
               type="checkbox"
@@ -160,6 +161,7 @@ export function SettingsPage({ status }: { status: AppStatus }) {
             />
             Confirm PIN, OTP and password on a separate Windows desktop
           </label>
+          )}
           <NoiseOption
             on={s.noiseWord}
             colors={s.noiseColors?.length ? s.noiseColors : DEFAULT_NOISE_COLORS}
@@ -246,7 +248,7 @@ export function SettingsPage({ status }: { status: AppStatus }) {
       <TotpCard />
       <TransferCard />
       <PresetsCard />
-      <ServiceCard status={status} />
+      {status.platform !== "macos" && <ServiceCard status={status} />}
       <div className="card pad col">
         <h2>About</h2>
         <dl className="fact" style={{ gridTemplateColumns: "160px 1fr", margin: 0 }}>

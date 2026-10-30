@@ -368,6 +368,22 @@ mod unix {
         tokio::net::UnixStream::connect(socket_path()).await
     }
 
+    /// The user's id: stands in for the Windows SID wherever the code names the owner.
+    pub fn current_user_sid() -> io::Result<String> {
+        // SAFETY: getuid has no preconditions and cannot fail.
+        Ok(unsafe { libc::getuid() }.to_string())
+    }
+
+    /// The interface channel by "name": here the socket path. (Service mode, which uses it
+    /// across accounts, is Windows-only.)
+    pub fn ui_pipe_name(_owner: &str) -> String {
+        ui_socket_path().display().to_string()
+    }
+
+    pub async fn connect_named(name: &str) -> io::Result<tokio::net::UnixStream> {
+        tokio::net::UnixStream::connect(name).await
+    }
+
     pub fn process_chain(_pid: u32, _depth: usize) -> String {
         String::new()
     }

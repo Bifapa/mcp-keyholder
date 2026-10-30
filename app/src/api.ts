@@ -168,6 +168,8 @@ export interface AppStatus {
   loginMode: LoginMode;
   serviceInstalled: boolean;
   desktopAvailable: boolean;
+  /** "windows", "macos", … — service mode and the separate desktop exist on Windows only. */
+  platform?: string;
   /** Set when the service is installed but unreachable; nothing else works then. */
   error?: string;
 }
