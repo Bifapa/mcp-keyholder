@@ -1088,3 +1088,15 @@ input[type="checkbox"] {
   outline: 2px solid var(--accent);
   background: var(--accent-soft);
 }
+
+/* Import groups: name, approval, delivery, key count, remove. */
+.group-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(110px, 1fr) minmax(150px, 1.2fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.file-remove:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
