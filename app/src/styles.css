@@ -1043,3 +1043,48 @@ input[type="checkbox"] {
   background: var(--chip);
   color: var(--ink);
 }
+
+/* "Who does what" under a chosen approval level or delivery mode. */
+.roles {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+.roles dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+.roles dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+/* Import: drafts of the current file as tabs above the form. */
+.draft-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.draft-tabs button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.draft-tabs button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-soft-ink);
+}
+.raw mark.current {
+  outline: 2px solid var(--accent);
+  background: var(--accent-soft);
+}

@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { Component, Fragment, useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 import { MODE_INFO, TIER_LABEL, type Mode, type Tier } from "./api";
 
 const svg = (children: ReactNode, size = 18, width = 1.8) => (
@@ -135,6 +135,20 @@ export function Segmented<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+/** "Who does what" rows under a chosen approval level or delivery mode. */
+export function Roles({ rows }: { rows: [string, string][] }) {
+  return (
+    <dl className="roles">
+      {rows.map(([who, what]) => (
+        <Fragment key={who}>
+          <dt>{who}</dt>
+          <dd>{what}</dd>
+        </Fragment>
+      ))}
+    </dl>
   );
 }
 

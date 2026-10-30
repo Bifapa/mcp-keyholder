@@ -328,6 +328,42 @@ export const TIER_HINT: Record<Tier, string> = {
   sealed: "Never given to agents. Only to you, in this window, after you confirm it's you.",
 };
 
+/** Who does what at each approval level. */
+export const TIER_ROLES: Record<Tier, [string, string][]> = {
+  auto: [
+    ["Agent", "gets the key right away, no window"],
+    ["You", "nothing to do; every use is written to the log"],
+  ],
+  soft: [
+    ["Agent", "asks for access and waits"],
+    ["You", "click Allow in the approval window — guards against accidents, not against a determined agent"],
+  ],
+  pin: [
+    ["Agent", "asks for access and waits"],
+    ["You", "type your 4–6 digit PIN on a separate Windows desktop"],
+  ],
+  otp: [
+    ["Agent", "asks for access and waits"],
+    ["You", "type a code from your authenticator app; one code approves one request"],
+  ],
+  sealed: [
+    ["Agent", "never gets it, not even with a grant"],
+    ["You", "view or copy it in MCP Keyholder after confirming with your password and code"],
+  ],
+};
+
+/** Who does what in each delivery mode that works today. */
+export const MODE_ROLES: Record<"reveal" | "env", [string, string][]> = {
+  reveal: [
+    ["Agent", "receives the value in the MCP reply and can use it anywhere"],
+    ["Risk", "the value stays in the agent's chat history"],
+  ],
+  env: [
+    ["Agent", "runs a command through kh run; the key goes into that process's environment"],
+    ["Risk", "low — the agent sees only the command's output, never the value"],
+  ],
+};
+
 export const MODE_INFO: Record<Mode, { title: string; desc: string; available: boolean }> = {
   reveal: { title: "Return the value", desc: "The agent gets the key in the MCP response. Convenient, but the value stays in the agent's history.", available: true },
   env: { title: "Environment variable", desc: "kh run puts the key into the process environment. The agent never sees the value in the chat.", available: true },
