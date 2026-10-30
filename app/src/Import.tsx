@@ -165,6 +165,11 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
 
       {files.length > 0 && (
         <div className="row" style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div className="file-panel">
+          <span className="small muted" style={{ padding: "0 4px" }}>
+            {files.length} {files.length === 1 ? "file" : "files"}
+            {files.length > 10 ? " · scroll for more" : ""}
+          </span>
           <div className="card file-list" role="list" aria-label="Files">
             {files.map((x, i) => {
               const n = drafts.filter((d) => d.file === i).length;
@@ -182,6 +187,7 @@ export function ImportPage({ existing, onDone }: { existing: string[]; onDone: (
                 </div>
               );
             })}
+          </div>
           </div>
 
           {f && (

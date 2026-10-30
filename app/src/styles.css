@@ -987,14 +987,20 @@ input[type="checkbox"] {
 }
 
 /* Import: the file list scrolls on its own and stays in view. */
-.file-list {
+.file-panel {
   flex: 1 1 220px;
   max-width: 280px;
-  padding: 6px;
-  max-height: calc(100vh - 190px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   position: sticky;
   top: 0;
+}
+/* Ten files in view, the rest scroll. */
+.file-list {
+  padding: 6px;
+  max-height: calc(10 * 42px + 12px);
+  overflow-y: auto;
 }
 .file-row {
   display: flex;
