@@ -50,6 +50,8 @@ API keys for agents usually end up in `.env` files, chat history and shell profi
 
 Download `MCP-Keyholder_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Bifapa/mcp-keyholder-releases/releases/latest) and run it. No administrator rights are needed. The app updates itself.
 
+**macOS** builds from source and is checked on every push (core tests and a full build). Not there yet: an installer and automatic updates, service mode, the separate desktop (codes are typed in the app window), locking on screen lock or sleep (only the auto-lock timer), and `kh` starting the app by itself — open MCP Keyholder before agents use it.
+
 On first launch:
 
 1. Set a master password and an anti-phishing word.
