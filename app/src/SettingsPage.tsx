@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { useElevation, useStepUp } from "./stepup";
 import { Icon, LockedButton, PasswordInput, Segmented, useSecondsLeft } from "./ui";
+import { NoiseWord, reducedMotion } from "./noiseword";
 import { UpdateSettings } from "./updates";
 import { exportVault, VaultFileImport } from "./vaultfile";
 
@@ -23,6 +24,7 @@ function confirmReasons(a: Settings, b: Settings): string[] {
   if (a.secureDesktop && !b.secureDesktop) r.push("separate desktop turned off");
   if (b.anchorPath && b.anchorPath !== a.anchorPath) r.push("new anchor file");
   if (b.fullLock !== a.fullLock) r.push("full lock changed");
+  if (a.noiseWord && !b.noiseWord) r.push("noise word turned off");
   return r;
 }
 
@@ -158,6 +160,7 @@ export function SettingsPage({ status }: { status: AppStatus }) {
             />
             Confirm PIN, OTP and password on a separate Windows desktop
           </label>
+          <NoiseOption on={s.noiseWord} onChange={(v) => edit({ noiseWord: v })} />
           <label className="field">
             Log anchor: file for the chain head (empty — off)
             <input
@@ -258,6 +261,35 @@ export function SettingsPage({ status }: { status: AppStatus }) {
         </p>
       </div>
     </>
+  );
+}
+
+/** The noise-word option, off by default, offered with a live demo on a sample word. */
+function NoiseOption({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  const [demo, setDemo] = useState(false);
+  return (
+    <div className="sub-panel col" style={{ gap: 8 }}>
+      <label className="row small">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+        Show the anti-phishing word as moving noise
+      </label>
+      <span className="hint">
+        The word is drawn with drifting noise: you read it in motion, while a screenshot or any single captured frame shows only
+        noise. Approval windows are already hidden from screen capture; this also covers captures that get around that.
+      </span>
+      <button className="link" style={{ alignSelf: "flex-start" }} onClick={() => setDemo((v) => !v)} aria-expanded={demo}>
+        {demo ? "Hide the demo" : "Show a demo"}
+      </button>
+      {demo &&
+        (reducedMotion() ? (
+          <span className="hint">Animations are off in Windows, so the demo can't play — without motion the word can't be read.</span>
+        ) : (
+          <div className="antiphish-block">
+            <span className="small muted">Demo — the word here is “sample”, not yours</span>
+            <NoiseWord word="sample" height={56} />
+          </div>
+        ))}
+    </div>
   );
 }
 

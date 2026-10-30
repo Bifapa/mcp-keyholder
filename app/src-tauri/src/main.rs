@@ -109,6 +109,7 @@ fn desktop_test() {
         agent_note: None,
         antiphish: "test".into(),
         field: desktop::Field::Password,
+        noise: !std::env::args().any(|a| a == "--plain"),
     });
     let report = format!(
         "available={} elapsed_ms={} result={}\n",

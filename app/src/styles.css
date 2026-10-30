@@ -945,3 +945,14 @@ input[type="checkbox"] {
   flex-direction: column;
   gap: 10px;
 }
+
+/* The anti-phishing word as moving noise (Settings demo and the approval window). */
+.antiphish-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+}

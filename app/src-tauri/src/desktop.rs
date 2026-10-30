@@ -25,6 +25,8 @@ pub struct Prompt {
     pub agent_note: Option<String>,
     pub antiphish: String,
     pub field: Field,
+    /// Draw the anti-phishing word as moving noise (the "noise word" setting).
+    pub noise: bool,
 }
 
 pub struct Answer {
@@ -63,7 +65,9 @@ mod win {
 
     use windows_sys::Win32::Foundation::{GetLastError, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
     use windows_sys::Win32::Graphics::Gdi::{
-        BeginPaint, CreateFontW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect, FrameRect, InvalidateRect,
+        BeginPaint, CreateCompatibleDC, CreateDIBSection, CreateFontW, CreateSolidBrush, DeleteDC, DeleteObject, DrawTextW,
+        EndPaint, ExcludeClipRect, FillRect, FrameRect, GdiFlush, InvalidateRect, SetTextCharacterExtra, StretchDIBits, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+        DIB_RGB_COLORS, SRCCOPY,
         SelectObject, SetBkColor, SetBkMode, SetTextColor, UpdateWindow, HBRUSH, HFONT, PAINTSTRUCT, TRANSPARENT,
     };
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -74,8 +78,8 @@ mod win {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
         GetSystemMetrics, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, KillTimer, LoadCursorW,
-        PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer, SetWindowDisplayAffinity, ShowWindow,
-        TranslateMessage, WDA_EXCLUDEFROMCAPTURE,
+        PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer, SetWindowDisplayAffinity, ShowWindow, SystemParametersInfoW,
+        TranslateMessage, SPI_GETCLIENTAREAANIMATION, WDA_EXCLUDEFROMCAPTURE,
         IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLOREDIT,
         WM_DESTROY, WM_ERASEBKGND,
         WM_KEYDOWN, WM_LBUTTONDOWN, WM_PAINT, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
@@ -93,6 +97,8 @@ mod win {
     const TIMER_ARM: usize = 1;
     const TIMER_GIVE_UP: usize = 2;
     const TIMER_BEAT: usize = 3;
+    /// Timer 4 moves the noise of the anti-phishing word.
+    const TIMER_NOISE: usize = 4;
     const GIVE_UP_MS: u32 = 120_000;
     const BEAT_MS: u32 = 500;
     /// No heartbeat for this long means the window thread hangs: the screen is switched back.
@@ -191,6 +197,8 @@ mod win {
         focus: usize,
         /// The first field shows its characters ("Show" next to its label).
         shown: bool,
+        /// The anti-phishing word as moving noise; None draws it as plain text.
+        noise: Option<Noise>,
     }
 
     // Raw window handles are only touched on the window's own thread.
@@ -232,6 +240,182 @@ mod win {
     /// window could cover and never get back (the missing top line).
     fn field_rect(y: i32) -> RECT {
         RECT { left: PAD, top: y + 22, right: W - PAD, bottom: y + 54 }
+    }
+
+    // ---------- anti-phishing word as moving noise ----------
+    //
+    // Two noise fields drift in opposite directions: the background to the left, the inside of the
+    // letters to the right. Every single frame is uniform noise, so a still capture shows no word;
+    // in motion the opposing drift makes the letters stand out clearly. (The window is also
+    // excluded from capture; this covers captures that get past that.)
+
+    // Fine grain, big capitals and a steady drift keep the word readable in motion.
+    const CELL: i32 = 2;
+    const NOISE_MS: u32 = 40;
+    // Each cell takes one of these greys at random.
+    const GREYS: &[u32] = &[30, 105, 180, 255];
+
+    struct Noise {
+        w: usize,
+        h: usize,
+        mask: Vec<bool>,
+        /// Random grey levels in [0, 1).
+        back: Vec<f32>,
+        letters: Vec<f32>,
+        t: usize,
+    }
+
+    /// Where the word goes inside the anti-phishing box.
+    fn word_rect(l: Layout) -> RECT {
+        RECT { left: PAD + 12, top: l.phish_y + 28, right: W - PAD - 12, bottom: l.phish_y + 140 }
+    }
+
+    impl Noise {
+        /// None when Windows animations are off: moving noise would then be unreadable, so the
+        /// word is drawn as plain text.
+        unsafe fn new(word: &str, area: RECT) -> Option<Noise> {
+            let mut animate: i32 = 1;
+            SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &mut animate as *mut i32 as *mut c_void, 0);
+            if animate == 0 {
+                return None;
+            }
+            let w = ((area.right - area.left) / CELL) as usize;
+            let h = ((area.bottom - area.top) / CELL) as usize;
+            let mask = text_mask(word, w, h)?;
+            // Visual noise, not a secret: xorshift seeded from the clock is enough.
+            let mut seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0x9E37_79B9_7F4A_7C15)
+                | 1;
+            let mut next = || {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                (seed >> 40) as f32 / (1u64 << 24) as f32
+            };
+            let back = (0..w * h).map(|_| next()).collect();
+            let letters = (0..w * h).map(|_| next()).collect();
+            Some(Noise { w, h, mask, back, letters, t: 0 })
+        }
+
+        fn frame(&self) -> Vec<u32> {
+            let (w, h) = (self.w, self.h);
+            // 1.5 cells per frame: fast enough to pick the letters out at a glance.
+            let shift = (self.t * 3 / 2) % w;
+            let mut px = vec![0u32; w * h];
+            for y in 0..h {
+                for x in 0..w {
+                    let i = y * w + x;
+                    let v = if self.mask[i] {
+                        self.letters[y * w + (x + w - shift) % w] // drifts right
+                    } else {
+                        self.back[y * w + (x + shift) % w] // drifts left
+                    };
+                    // DIB pixels are 0x00RRGGBB; a grey has equal channels.
+                    let g = GREYS[((v * GREYS.len() as f32) as usize).min(GREYS.len() - 1)];
+                    px[i] = (g << 16) | (g << 8) | g;
+                }
+            }
+            px
+        }
+    }
+
+    fn dib_info(w: usize, h: usize) -> BITMAPINFO {
+        let mut bmi: BITMAPINFO = unsafe { std::mem::zeroed() };
+        bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+        bmi.bmiHeader.biWidth = w as i32;
+        bmi.bmiHeader.biHeight = -(h as i32); // top-down rows
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+        bmi
+    }
+
+    /// The word in capitals at cell resolution, as large as fits, centred, strokes one cell
+    /// thicker on every side: true where a letter covers the cell.
+    unsafe fn text_mask(word: &str, w: usize, h: usize) -> Option<Vec<bool>> {
+        const DT_NOPREFIX: u32 = 0x0800;
+        // Drawn into a taller scratch bitmap, then the inked box is measured and centred.
+        let (sw, sh) = (w, h * 2);
+        let dc = CreateCompatibleDC(null_mut());
+        if dc.is_null() {
+            return None;
+        }
+        let bmi = dib_info(sw, sh);
+        let mut bits: *mut c_void = null_mut();
+        let bmp = CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &mut bits, null_mut(), 0);
+        if bmp.is_null() || bits.is_null() {
+            DeleteDC(dc);
+            return None;
+        }
+        let old_bmp = SelectObject(dc, bmp as _);
+        SetBkMode(dc, TRANSPARENT as i32);
+        SetTextColor(dc, 0x00FF_FFFF);
+        SetTextCharacterExtra(dc, 2);
+        let face = wide("Segoe UI");
+        let mut text: Vec<u16> = word.to_uppercase().encode_utf16().collect();
+        let px = std::slice::from_raw_parts_mut(bits as *mut u32, sw * sh);
+        // Capitals are about 0.7 em, so this starts near the full height and shrinks to fit.
+        let mut size = (h as i32 * 13) / 10;
+        let mut ink = None;
+        for _ in 0..12 {
+            px.fill(0);
+            // Non-antialiased: every cell is either letter or background.
+            let font = CreateFontW(-size, 0, 0, 0, 900, 0, 0, 0, 1, 0, 0, 3, 0, face.as_ptr());
+            let old_font = SelectObject(dc, font as _);
+            let mut r = RECT { left: 2, top: 0, right: sw as i32, bottom: sh as i32 };
+            DrawTextW(dc, text.as_mut_ptr(), text.len() as i32, &mut r, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
+            GdiFlush();
+            SelectObject(dc, old_font);
+            DeleteObject(font as _);
+            let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
+            for y in 0..sh {
+                for x in 0..sw {
+                    if px[y * sw + x] & 0xFF > 0x80 {
+                        x0 = x0.min(x);
+                        y0 = y0.min(y);
+                        x1 = x1.max(x);
+                        y1 = y1.max(y);
+                    }
+                }
+            }
+            if x0 == usize::MAX {
+                break; // nothing to draw
+            }
+            let (bw, bh) = (x1 - x0 + 1, y1 - y0 + 1);
+            // Room for the thickening and a small margin; a word reaching the right edge was cut.
+            if bw + 4 <= w && bh + 4 <= h && x1 + 1 < sw {
+                ink = Some((x0, y0, bw, bh));
+                break;
+            }
+            let by_w = size * (w as i32 - 6) / (bw as i32).max(1);
+            let by_h = size * (h as i32 - 6) / (bh as i32).max(1);
+            size = by_w.min(by_h).min(size * 9 / 10).max(6);
+        }
+        let thin = ink.map(|(x0, y0, bw, bh)| {
+            let (ox, oy) = ((w - bw) / 2, (h - bh) / 2);
+            let mut m = vec![false; w * h];
+            for y in 0..bh {
+                for x in 0..bw {
+                    m[(oy + y) * w + ox + x] = px[(y0 + y) * sw + x0 + x] & 0xFF > 0x80;
+                }
+            }
+            m
+        });
+        SelectObject(dc, old_bmp);
+        DeleteObject(bmp as _);
+        DeleteDC(dc);
+        let thin = thin?;
+        // One cell thicker on every side: thin strokes get lost in the noise.
+        let at = |x: isize, y: isize| x >= 0 && y >= 0 && (x as usize) < w && (y as usize) < h && thin[y as usize * w + x as usize];
+        let mut mask = vec![false; w * h];
+        for y in 0..h as isize {
+            for x in 0..w as isize {
+                mask[y as usize * w + x as usize] = at(x, y) || at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1);
+            }
+        }
+        Some(mask)
     }
 
     unsafe fn wide(s: &str) -> Vec<u16> {
@@ -351,7 +535,7 @@ mod win {
         let note_y = y + 4;
         y += note_h + 12;
         let phish_y = y;
-        y += 64 + 18;
+        y += 150 + 18;
         let input1_y = y;
         y += 62;
         let mut input2_y = -1;
@@ -408,6 +592,29 @@ mod win {
             return;
         };
         let p = Painter { hdc: hdc as *mut c_void };
+        // The noise goes first and the rest of the painting is clipped around it: filling the box
+        // first and drawing the noise after made the word area flash between frames.
+        if let Some(n) = &u.noise {
+            let r = word_rect(u.layout);
+            let px = n.frame();
+            let bmi = dib_info(n.w, n.h);
+            StretchDIBits(
+                hdc,
+                r.left,
+                r.top,
+                n.w as i32 * CELL,
+                n.h as i32 * CELL,
+                0,
+                0,
+                n.w as i32,
+                n.h as i32,
+                px.as_ptr() as *const c_void,
+                &bmi,
+                DIB_RGB_COLORS,
+                SRCCOPY,
+            );
+            ExcludeClipRect(hdc, r.left, r.top, r.left + n.w as i32 * CELL, r.top + n.h as i32 * CELL);
+        }
         let mut rc: RECT = std::mem::zeroed();
         GetClientRect(hwnd, &mut rc);
         p.fill(rc, u.bg);
@@ -450,7 +657,7 @@ mod win {
             left: PAD,
             top: u.layout.phish_y,
             right: W - PAD,
-            bottom: u.layout.phish_y + 64,
+            bottom: u.layout.phish_y + 150,
         };
         p.fill(phish_box, u.field_bg);
         p.text(
@@ -463,12 +670,14 @@ mod win {
             f_small,
             DT_LEFT | DT_SINGLELINE,
         );
-        let word_y = u.layout.phish_y + 30;
-        let mut x = PAD + 14;
-        for ch in u.antiphish.chars() {
-            let s: String = ch.to_string();
-            p.text(&s, x, word_y, 26, 28, ACCENT, f_phish, DT_LEFT | DT_SINGLELINE);
-            x += 22;
+        if u.noise.is_none() {
+            let word_y = u.layout.phish_y + 70;
+            let mut x = PAD + 14;
+            for ch in u.antiphish.chars() {
+                let s: String = ch.to_string();
+                p.text(&s, x, word_y, 26, 28, ACCENT, f_phish, DT_LEFT | DT_SINGLELINE);
+                x += 22;
+            }
         }
 
         let (l1, l2) = labels(u.field);
@@ -550,6 +759,24 @@ mod win {
             }
             WM_TIMER if w == TIMER_BEAT => {
                 beat();
+                0
+            }
+            WM_TIMER if w == TIMER_NOISE => {
+                let area = {
+                    let mut g = UI.lock().unwrap_or_else(|e| e.into_inner());
+                    match g.as_mut() {
+                        Some(u) => {
+                            if let Some(n) = u.noise.as_mut() {
+                                n.t = n.t.wrapping_add(1);
+                            }
+                            Some(word_rect(u.layout))
+                        }
+                        None => None,
+                    }
+                };
+                if let Some(r) = area {
+                    InvalidateRect(hwnd, &r, 0);
+                }
                 0
             }
             WM_COMMAND => {
@@ -642,6 +869,7 @@ mod win {
                 KillTimer(hwnd, TIMER_ARM);
                 KillTimer(hwnd, TIMER_GIVE_UP);
                 KillTimer(hwnd, TIMER_BEAT);
+                KillTimer(hwnd, TIMER_NOISE);
                 CURRENT_HWND.store(0, std::sync::atomic::Ordering::SeqCst);
                 PostQuitMessage(0);
                 0
@@ -694,13 +922,16 @@ mod win {
         // Copy what is needed and release UI: creating controls and moving focus send messages
         // back into wndproc, which locks UI too — holding it here deadlocked the window before it
         // ever appeared (black desktop, cursor only).
-        let (field, layout, font) = {
+        let (field, layout, font, noise) = {
             let g = UI.lock().unwrap_or_else(|e| e.into_inner());
             match g.as_ref() {
-                Some(u) => (u.field, u.layout, u.fonts[1]),
+                Some(u) => (u.field, u.layout, u.fonts[1], u.noise.is_some()),
                 None => return,
             }
         };
+        if noise {
+            SetTimer(hwnd, TIMER_NOISE, NOISE_MS, None);
+        }
         let hinst = GetModuleHandleW(null_mut());
         let pass_style = if mask_password(field) { 0x0020 } else { 0 }; // ES_PASSWORD
         let class = wide("EDIT");
@@ -766,6 +997,7 @@ mod win {
 
             {
                 let mut g = UI.lock().unwrap_or_else(|e| e.into_inner());
+                let noise = if p.noise { Noise::new(&p.antiphish, word_rect(layout)) } else { None };
                 *g = Some(Ui {
                     heading: p.heading,
                     facts: p.facts,
@@ -791,6 +1023,7 @@ mod win {
                     armed: false,
                     focus: 0,
                     shown: false,
+                    noise,
                 });
             }
 

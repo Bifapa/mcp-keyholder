@@ -636,7 +636,8 @@ impl Daemon {
             || (old.secure_desktop && !p.settings.secure_desktop)
             || (!p.settings.anchor_path.is_empty() && p.settings.anchor_path != old.anchor_path)
             || p.settings.login_mode != old.login_mode
-            || (p.settings.full_lock != old.full_lock);
+            || (p.settings.full_lock != old.full_lock)
+            || (old.noise_word && !p.settings.noise_word);
         if weakening {
             self.require_elevated()?;
         }
@@ -866,15 +867,17 @@ impl Daemon {
     // ---------- approval surface ----------
 
     fn approval_current(&self) -> CallResult {
-        let (antiphish, has_pin) = {
+        let (antiphish, has_pin, noise_word) = {
             let v = self.vault();
-            (v.antiphish_word().unwrap_or_default(), v.has_pin())
+            let noise = v.settings().map(|s| s.noise_word).unwrap_or(false);
+            (v.antiphish_word().unwrap_or_default(), v.has_pin(), noise)
         };
         Ok(json!({
             "request": self.broker.current_shown(),
             "antiphish": antiphish,
             "queue": self.broker.queue_len(),
             "hasPin": has_pin,
+            "noiseWord": noise_word,
         }))
     }
 
@@ -1141,6 +1144,18 @@ mod tests {
         d.call("end_stepup", json!({})).unwrap();
         d.call("import_chunk", json!({ "offset": 0, "data": super::BASE64.encode(&file) })).unwrap();
         assert_eq!(d.call("import_vault", json!({ "password": "correct horse battery" })).unwrap_err(), "stepup_required");
+    }
+
+    #[test]
+    fn noise_word_is_off_by_default_and_turning_it_off_needs_stepup() {
+        let (_d, d) = daemon();
+        let mut s = d.call("get_settings", json!({})).unwrap();
+        assert_eq!(s["noiseWord"], json!(false));
+        s["noiseWord"] = json!(true);
+        d.call("set_settings", json!({ "settings": s.clone() })).unwrap();
+        assert_eq!(d.call("approval_current", json!({})).unwrap()["noiseWord"], json!(true));
+        s["noiseWord"] = json!(false);
+        assert_eq!(d.call("set_settings", json!({ "settings": s })).unwrap_err(), "stepup_required");
     }
 
     #[test]

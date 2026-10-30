@@ -208,6 +208,15 @@ async fn settings_on(app: &AppHandle) -> bool {
     }
 }
 
+/// The "noise word" setting; off when it cannot be read (vault locked, service unreachable).
+async fn noise_word(app: &AppHandle) -> bool {
+    let st = app.state::<AppState>();
+    match st.call("get_settings", json!({})).await {
+        Ok(v) => v.get("noiseWord").and_then(|x| x.as_bool()).unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
 async fn antiphish(app: &AppHandle) -> String {
     let st = app.state::<AppState>();
     match st.call("approval_current", json!({})).await {
@@ -296,6 +305,7 @@ pub async fn approval_native(
         agent_note: Some(reason),
         antiphish: cur.get("antiphish").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
         field: level_field(level, has_pin),
+        noise: noise_word(&app).await,
     };
     let a = run_prompt(p).await?;
     st.call(
@@ -344,6 +354,7 @@ pub async fn stepup_native(app: AppHandle, window: WebviewWindow) -> Res<i64> {
         agent_note: None,
         antiphish: antiphish(&app).await,
         field: Field::PasswordOtp,
+        noise: noise_word(&app).await,
     };
     let a = run_prompt(p).await?;
     let until = st.call("stepup", json!({ "password": a.first, "code": a.second })).await?;
@@ -364,6 +375,7 @@ pub async fn unlock_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
         agent_note: None,
         antiphish: antiphish(&app).await,
         field: Field::Password,
+        noise: noise_word(&app).await,
     };
     let a = run_prompt(p).await?;
     st.call("unlock", json!({ "password": a.first })).await?;
@@ -391,6 +403,7 @@ pub async fn login_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
                 agent_note: None,
                 antiphish: antiphish(&app).await,
                 field,
+                noise: noise_word(&app).await,
             };
             run_prompt(p).await?.first
         }
@@ -401,6 +414,7 @@ pub async fn login_native(app: AppHandle, window: WebviewWindow) -> Res<()> {
                 agent_note: None,
                 antiphish: antiphish(&app).await,
                 field: Field::Password,
+                noise: noise_word(&app).await,
             };
             run_prompt(p).await?.first
         }
@@ -491,6 +505,7 @@ pub async fn import_vault_native(app: AppHandle, window: WebviewWindow, path: St
         agent_note: None,
         antiphish: antiphish(&app).await,
         field: Field::Password,
+        noise: noise_word(&app).await,
     };
     let a = run_prompt(p).await?;
     st.call("import_vault", json!({ "password": a.first })).await

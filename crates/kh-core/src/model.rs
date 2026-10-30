@@ -332,6 +332,10 @@ pub struct Settings {
     /// Where to append the audit chain head, outside the database (empty = off).
     #[serde(default)]
     pub anchor_path: String,
+    /// Show the anti-phishing word as moving noise, so a still screen capture shows no word.
+    /// Off by default; offered in Settings with a demo.
+    #[serde(default)]
+    pub noise_word: bool,
 }
 
 fn yes() -> bool {
@@ -349,6 +353,7 @@ impl Default for Settings {
             full_lock: false,
             secure_desktop: true,
             anchor_path: String::new(),
+            noise_word: false,
         }
     }
 }

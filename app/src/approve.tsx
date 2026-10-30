@@ -1,6 +1,7 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api, applyTheme, DESKTOP_OFF, errText, getTheme, onChanged, TIER_LABEL, type PendingView, type Tier } from "./api";
+import { NoiseWord, reducedMotion } from "./noiseword";
 import { ErrorBoundary, Icon, TierPill } from "./ui";
 import "./styles.css";
 
@@ -37,6 +38,7 @@ function AntiPhish({ word }: { word: string }) {
 function Approve() {
   const [req, setReq] = useState<PendingView | null>(null);
   const [word, setWord] = useState("");
+  const [noise, setNoise] = useState(false);
   const [queue, setQueue] = useState(0);
   const [hasPin, setHasPin] = useState(false);
   const [keep, setKeep] = useState<Set<string>>(new Set());
@@ -54,6 +56,7 @@ function Approve() {
     try {
       const r = await api.approvalCurrent();
       setWord(r.antiphish);
+      setNoise(!!r.noiseWord && !reducedMotion());
       setQueue(r.queue);
       setHasPin(r.hasPin);
       setReq(r.request);
@@ -159,10 +162,19 @@ function Approve() {
         <span className={`pill ${needOtp ? "otp" : usePin ? "pin" : "soft"}`}>
           {needCode ? Icon.lock(13) : Icon.shield(13)} {needOtp ? "OTP code required" : usePin ? "PIN required" : "Approval"}
         </span>
-        <span className="row small muted" style={{ gap: 6 }} title="Your anti-phishing word. If it's missing, this is not MCP Keyholder.">
-          word: <AntiPhish word={word} />
-        </span>
+        {!noise && (
+          <span className="row small muted" style={{ gap: 6 }} title="Your anti-phishing word. If it's missing, this is not MCP Keyholder.">
+            word: <AntiPhish word={word} />
+          </span>
+        )}
       </div>
+
+      {noise && (
+        <div className="antiphish-block" title="Your anti-phishing word. If it's missing, this is not MCP Keyholder.">
+          <span className="small muted">Anti-phishing word</span>
+          <NoiseWord word={word} height={56} />
+        </div>
+      )}
 
       <h1 style={{ fontSize: 19 }}>
         {req.client} asks for {req.keys.length} {req.keys.length === 1 ? "key" : "keys"}
